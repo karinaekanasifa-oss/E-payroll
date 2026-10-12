@@ -42,6 +42,12 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
             </a>
           </li>
           <li class="sidebar-menu-item">
+            <a href="index.php?page=shift" class="sidebar-menu-link <?php echo ($current_page == 'shift') ? 'active' : ''; ?>" id="menu-uiforms" title="Forms and Input">
+              <i class="bi bi-clock-fill"></i>
+              <span>Shift</span>
+            </a>
+          </li>
+          <li class="sidebar-menu-item">
             <a href="index.php?page=absensi" class="sidebar-menu-link <?php echo ($current_page == 'absensi') ? 'active' : ''; ?>" id="menu-uibuttons" title="Buttons">
               <i class="bi bi-calendar-check-fill"></i>
               <span>Rekap Absensi</span>

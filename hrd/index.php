@@ -67,12 +67,24 @@ $page = isset($_GET['page']) ? $_GET['page'] : "dashboard";
         case 'hapus-karyawan':
             include 'pages/karyawan/hapus.php';
             break;  
+        case 'shift':
+            include 'pages/shift/shift.php';
+            break;    
+        case 'tambah-shift':
+            include 'pages/shift/tambah.php';
+            break;
+        case 'edit-shift':
+            include 'pages/shift/update.php';
+            break;
+        case 'hapus-shift':
+            include 'pages/shift/hapus.php';
+            break;    
         case 'absensi':
             include 'pages/absensi/absensi.php';
             break;
-        case 'tambah-absensi':
-            include 'pages/absensi/tambah.php';
-            break; 
+        //case 'tambah-absensi':
+          //  include 'pages/absensi/tambah.php';
+           // break;
         case 'edit-absensi':
             include 'pages/absensi/update.php';
             break;

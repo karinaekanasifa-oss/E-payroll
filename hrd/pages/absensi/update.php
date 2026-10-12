@@ -1,10 +1,4 @@
 <?php
-/**
- * --------------------------------------------------------------------------
- * HALAMAN EDIT ABSENSI - OOP VERSION
- * --------------------------------------------------------------------------
- */
-
 require_once 'database/connection.php';
 
 class EditAttendanceOOP {
@@ -15,7 +9,6 @@ class EditAttendanceOOP {
         $this->conn = $db->conn;
     }
 
-    // Mengambil data absensi berdasarkan ID
     public function getAttendanceById($id) {
         $stmt = $this->conn->prepare("SELECT * FROM attedances WHERE id = ?");
         $stmt->bind_param("i", $id);
@@ -23,15 +16,17 @@ class EditAttendanceOOP {
         return $stmt->get_result()->fetch_assoc();
     }
 
-    // Mengambil daftar karyawan untuk dropdown
     public function getAllEmployees() {
         return $this->conn->query("SELECT employees.id, employees.nip, users.nama FROM employees JOIN users ON employees.user_id = users.id");
     }
 
-    // Proses Update Data Absensi
-    public function updateAttendance($id, $employee_id, $tanggal, $jam_masuk, $jam_keluar, $status) {
-        $stmt = $this->conn->prepare("UPDATE attedances SET employee_id = ?, tanggal = ?, jam_masuk = ?, jam_keluar = ?, status = ? WHERE id = ?");
-        $stmt->bind_param("issssi", $employee_id, $tanggal, $jam_masuk, $jam_keluar, $status, $id);
+    public function getAllShifts() {
+        return $this->conn->query("SELECT * FROM shifts ORDER BY id ASC");
+    }
+
+    public function updateAttendance($id, $employee_id, $shift_id, $tanggal, $jam_masuk, $jam_keluar, $status) {
+        $stmt = $this->conn->prepare("UPDATE attedances SET employee_id = ?, shift_id = ?, tanggal = ?, jam_masuk = ?, jam_keluar = ?, status = ? WHERE id = ?");
+        $stmt->bind_param("iissssi", $employee_id, $shift_id, $tanggal, $jam_masuk, $jam_keluar, $status, $id);
         return $stmt->execute();
     }
 }
@@ -45,17 +40,15 @@ if (!$attendance) {
     exit;
 }
 
-$success = false;
-$error = '';
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $employee_id = $_POST['employee_id'];
+    $shift_id    = $_POST['shift_id'];
     $tanggal     = $_POST['tanggal'];
     $jam_masuk   = !empty($_POST['jam_masuk']) ? $_POST['jam_masuk'] : NULL;
     $jam_keluar  = !empty($_POST['jam_keluar']) ? $_POST['jam_keluar'] : NULL;
     $status      = $_POST['status'];
 
-    if ($editObj->updateAttendance($id, $employee_id, $tanggal, $jam_masuk, $jam_keluar, $status)) {
+    if ($editObj->updateAttendance($id, $employee_id, $shift_id, $tanggal, $jam_masuk, $jam_keluar, $status)) {
         echo "<script>alert('Data absensi berhasil diperbarui!'); window.location='index.php?page=absensi';</script>";
         exit;
     } else {
@@ -64,31 +57,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $employees = $editObj->getAllEmployees();
+$shifts = $editObj->getAllShifts();
 ?>
 
-<!-- START: Page Header -->
 <div class="page-header mb-4">
   <div>
     <h1 class="page-title fw-bold text-dark">Edit Absensi</h1>
-    <p class="page-subtitle text-muted">Perbarui data presensi kehadiran karyawan.</p>
+    <p class="page-subtitle text-muted">Perbarui data presensi kehadiran dan shift karyawan.</p>
   </div>
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="index.php?page=dashboard" class="text-decoration-none text-success">Home</a></li>
-      <li class="breadcrumb-item text-muted">HRD</li>
-      <li class="breadcrumb-item"><a href="index.php?page=absensi" class="text-decoration-none text-success">Absensi</a></li>
-      <li class="breadcrumb-item active text-dark" aria-current="page">Edit</li>
-    </ol>
-  </nav>
 </div>
-<!-- END: Page Header -->
 
-<!-- START: Form Edit Card -->
 <div class="card border-0 shadow-sm rounded-3 p-4 bg-white" style="max-width: 700px;">
-  <?php if (!empty($error)): ?>
-    <div class="alert alert-danger py-2"><?= $error; ?></div>
-  <?php endif; ?>
-
   <form method="POST" action="">
     <div class="mb-3">
       <label class="form-label fw-bold small text-uppercase">Nama Karyawan</label>
@@ -97,6 +76,18 @@ $employees = $editObj->getAllEmployees();
         <?php while ($emp = $employees->fetch_assoc()): ?>
           <option value="<?= $emp['id']; ?>" <?= ($emp['id'] == $attendance['employee_id']) ? 'selected' : ''; ?>>
             <?= htmlspecialchars($emp['nama'] . ' (' . $emp['nip'] . ')'); ?>
+          </option>
+        <?php endwhile; ?>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-bold small text-uppercase">Shift Kerja</label>
+      <select name="shift_id" class="form-select" required>
+        <option value="">-- Pilih Shift --</option>
+        <?php while ($shf = $shifts->fetch_assoc()): ?>
+          <option value="<?= $shf['id']; ?>" <?= ($shf['id'] == ($attendance['shift_id'] ?? 0)) ? 'selected' : ''; ?>>
+            <?= strtoupper(htmlspecialchars($shf['nama_shift'])) . ' (' . $shf['jam_masuk'] . ' - ' . $shf['jam_keluar'] . ')'; ?>
           </option>
         <?php endwhile; ?>
       </select>
@@ -134,4 +125,3 @@ $employees = $editObj->getAllEmployees();
     </div>
   </form>
 </div>
-<!-- END: Form Edit Card -->
