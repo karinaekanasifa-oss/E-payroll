@@ -1,61 +1,53 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * HALAMAN TAMBAH KARYAWAN - OOP VERSION
+ * HALAMAN TAMBAH KARYAWAN - OOP VERSION (DENGAN REKENING BANK)
  * --------------------------------------------------------------------------
  */
 
-// Menyesuaikan path koneksi database dari folder pages keluar ke root
 require_once 'database/connection.php';
 
-// Instansiasi objek database
 $db = new Database();
 $conn = $db->conn;
 
-// Mengambil data jabatan untuk pilihan (dropdown) pada form
 $query_jabatan = $conn->query("SELECT * FROM positions ORDER BY nama_jabatan ASC");
 
-// Jika tombol simpan/submit ditekan
 if (isset($_POST['submit'])) {
     $nama        = mysqli_real_escape_string($conn, $_POST['nama']);
     $email       = mysqli_real_escape_string($conn, $_POST['email']);
     $password    = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $role        = 'karyawan'; // Sesuai ketentuan role di database
+    $role        = 'karyawan';
     $nip         = mysqli_real_escape_string($conn, $_POST['nip']);
     $position_id = mysqli_real_escape_string($conn, $_POST['position_id']);
     $tgl_masuk   = mysqli_real_escape_string($conn, $_POST['tgl_masuk']);
+    $nama_bank   = mysqli_real_escape_string($conn, $_POST['nama_bank']);
+    $no_rekening = mysqli_real_escape_string($conn, $_POST['no_rekening']);
 
-    // Mulai transaksi database untuk menjaga keamanan data relasi users & employees
     $conn->begin_transaction();
 
     try {
-        // 1. Masukkan data ke tabel users terlebih dahulu
         $queryUser = "INSERT INTO users (nama, email, password, role) VALUES ('$nama', '$email', '$password', '$role')";
         $conn->query($queryUser);
         
-        // Ambil ID user yang baru saja dibuat
         $user_id = $conn->insert_id;
 
-        // 2. Masukkan data ke tabel employees menggunakan user_id tersebut
-        $queryEmp = "INSERT INTO employees (user_id, position_id, nip, tgl_masuk) VALUES ('$user_id', '$position_id', '$nip', '$tgl_masuk')";
+        // Menyimpan data karyawan beserta nama_bank dan no_rekening[cite: 10]
+        $queryEmp = "INSERT INTO employees (user_id, position_id, nip, tgl_masuk, nama_bank, no_rekening) VALUES ('$user_id', '$position_id', '$nip', '$tgl_masuk', '$nama_bank', '$no_rekening')";
         $conn->query($queryEmp);
 
-        // Jika sukses, commit transaksi
         $conn->commit();
         echo "<script>alert('Data karyawan berhasil ditambahkan!'); window.location='index.php?page=karyawan';</script>";
     } catch (Exception $e) {
-        // Jika gagal, batalkan transaksi
         $conn->rollback();
         echo "<script>alert('Gagal menambahkan karyawan: " . $e->getMessage() . "');</script>";
     }
 }
 ?>
 
-<!-- START: Page Header Banner -->
 <div class="page-header">
   <div>
     <h1 class="page-title">Tambah Karyawan</h1>
-    <p class="page-subtitle">Formulir pendaftaran pegawai baru dan pembuatan akun login sistem.</p>
+    <p class="page-subtitle">Formulir pendaftaran pegawai baru, rekening bank, dan pembuatan akun login.</p>
   </div>
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb mb-0">
@@ -65,13 +57,10 @@ if (isset($_POST['submit'])) {
     </ol>
   </nav>
 </div>
-<!-- END: Page Header Banner -->
 
-<!-- START: Form Card Container -->
 <div class="table-card-custom p-4">
   <form action="" method="POST">
     <div class="row">
-      <!-- Informasi Akun (Tabel Users) -->
       <div class="col-md-6 mb-3">
         <label for="nama" class="form-label fw-bold">Nama Lengkap</label>
         <input type="text" class="form-control" id="nama" name="nama" placeholder="Masukkan nama lengkap karyawan" required>
@@ -87,10 +76,20 @@ if (isset($_POST['submit'])) {
         <input type="password" class="form-control" id="password" name="password" placeholder="Minimal 6 karakter" required>
       </div>
 
-      <!-- Informasi Kepegawaian (Tabel Employees & Positions) -->
       <div class="col-md-6 mb-3">
         <label for="nip" class="form-label fw-bold">NIP (Nomor Induk Pegawai)</label>
         <input type="text" class="form-control" id="nip" name="nip" placeholder="Contoh: EMP-2026-001" required>
+      </div>
+
+      <!-- Tambahan Input Nama Bank & No Rekening -->
+      <div class="col-md-6 mb-3">
+        <label for="nama_bank" class="form-label fw-bold">Nama Bank Tujuan</label>
+        <input type="text" class="form-control" id="nama_bank" name="nama_bank" placeholder="Contoh: BCA / BSI / Mandiri" required>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label for="no_rekening" class="form-label fw-bold">Nomor Rekening</label>
+        <input type="text" class="form-control" id="no_rekening" name="no_rekening" placeholder="Contoh: 1234567890" required>
       </div>
 
       <div class="col-md-6 mb-3">
@@ -121,4 +120,3 @@ if (isset($_POST['submit'])) {
     </div>
   </form>
 </div>
-<!-- END: Form Card Container -->

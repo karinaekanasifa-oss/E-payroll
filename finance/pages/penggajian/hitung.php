@@ -1,17 +1,18 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * HALAMAN HITUNG & PROSES GAJI - OOP VERSION (BURGUNDY THEME)
+ * HALAMAN HITUNG & PROSES GAJI - OOP VERSION (BURGUNDY THEME + SWEETALERT)
  * --------------------------------------------------------------------------
  */
 
-// Memanggil file koneksi database terlebih dahulu
-require_once 'database/connection.php';
+if (file_exists('database/connection.php')) {
+    require_once 'database/connection.php';
+} elseif (file_exists('../database/connection.php')) {
+    require_once '../database/connection.php';
+} elseif (file_exists('../../database/connection.php')) {
+    require_once '../../database/connection.php';
+}
 
-/**
- * Class CalculatePayrollOOP
- * Membungkus logika pengambilan data karyawan & penyimpanan perhitungan gaji ke database.
- */
 class CalculatePayrollOOP {
     private $conn;
 
@@ -20,9 +21,9 @@ class CalculatePayrollOOP {
         $this->conn = $db->conn;
     }
 
-    // Mengambil daftar karyawan beserta jabatan, gaji pokok, dan tunjangan
+    // 1. Mengambil data pegawai beserta informasi bank & rekening
     public function getEmployeesForPayroll() {
-        $query = "SELECT employees.id as emp_id, employees.nip, users.nama, positions.nama_jabatan, positions.gaji_pokok, positions.tunjangan 
+        $query = "SELECT employees.id as emp_id, employees.nip, employees.nama_bank, employees.no_rekening, users.nama, positions.nama_jabatan, positions.gaji_pokok, positions.tunjangan 
                   FROM employees 
                   JOIN users ON employees.user_id = users.id 
                   JOIN positions ON employees.position_id = positions.id 
@@ -30,43 +31,109 @@ class CalculatePayrollOOP {
         return $this->conn->query($query);
     }
 
-    // Menyimpan hasil perhitungan gaji ke tabel payrolls
-    public function savePayrollCalculation($employee_id, $bulan_tahun, $potongan, $total_gaji, $status_cair) {
+    // 2. Simpan data gaji & sesuaikan notifikasi berdasarkan status 'Dibayar' atau 'Pending'
+    public function processSavePayroll($data) {
+        $employee_id = intval($data['employee_id']);
+        $bulan_tahun = $data['bulan_tahun'];
+        $potongan    = floatval($data['potongan']);
+        $status_cair = $data['status_cair'];
+
+        // Ambil data gaji pokok & tunjangan
+        $stmtPos = $this->conn->prepare("SELECT positions.gaji_pokok, positions.tunjangan 
+                                          FROM employees 
+                                          JOIN positions ON employees.position_id = positions.id 
+                                          WHERE employees.id = ?");
+        $stmtPos->bind_param("i", $employee_id);
+        $stmtPos->execute();
+        $pos = $stmtPos->get_result()->fetch_assoc();
+
+        $gaji_pokok = $pos['gaji_pokok'] ?? 0;
+        $tunjangan  = $pos['tunjangan'] ?? 0;
+        $total_gaji = ($gaji_pokok + $tunjangan) - $potongan;
+
+        // Simpan ke tabel payrolls
         $stmt = $this->conn->prepare("INSERT INTO payrolls (employee_id, bulan_tahun, potongan, total_gaji, status_cair) VALUES (?, ?, ?, ?, ?)");
         $stmt->bind_param("isdds", $employee_id, $bulan_tahun, $potongan, $total_gaji, $status_cair);
-        return $stmt->execute();
+        
+        if ($stmt->execute()) {
+            // Cek apakah status cair adalah 'dibayar' atau 'pending'
+            if (strtolower($status_cair) == 'dibayar') {
+                // Jika Dibayar: Kirim notifikasi & tampilkan alert sukses terkirim
+                $judul = "Gaji Telah Diterbitkan & Dikirim";
+                $pesan = "Halo, gaji Anda untuk periode {$bulan_tahun} sebesar Rp " . number_format($total_gaji, 0, ',', '.') . " telah berhasil diproses dan dikirim ke rekening Anda.";
+                
+                $stmtNotif = $this->conn->prepare("INSERT INTO notifications (employee_id, judul, pesan, status_baca, created_at) VALUES (?, ?, ?, 'belum', NOW())");
+                $stmtNotif->bind_param("iss", $employee_id, $judul, $pesan);
+                $stmtNotif->execute();
+
+                $alertTitle = "Gaji Sukses Dikirim!";
+                $alertText  = "Perhitungan gaji berhasil disimpan dan notifikasi otomatis telah dikirimkan ke akun karyawan.";
+                $alertIcon  = "success";
+            } else {
+                // Jika Pending: JANGAN kirim notifikasi, tampilkan alert status pending
+                $alertTitle = "Data Gaji Disimpan (Pending)";
+                $alertText  = "Perhitungan gaji berhasil disimpan dengan status Pending. Belum ada notifikasi yang dikirim ke karyawan.";
+                $alertIcon  = "info";
+            }
+
+            // Tampilkan SweetAlert interaktif
+            echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
+            echo "<script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    Swal.fire({
+                        icon: '$alertIcon',
+                        title: '$alertTitle',
+                        text: '$alertText',
+                        confirmButtonColor: '#800020',
+                        confirmButtonText: 'OK',
+                        allowOutsideClick: false
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location='index.php?page=gaji';
+                        }
+                    });
+                });
+            </script>";
+            exit;
+        } else {
+            echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
+            echo "<script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal Menyimpan!',
+                        text: 'Terjadi kesalahan saat memproses data penggajian.',
+                        confirmButtonColor: '#800020'
+                    });
+                });
+            </script>";
+        }
     }
 }
 
-// Instansiasi Objek
-$payrollCalcObj = new CalculatePayrollOOP();
-$karyawan_list = $payrollCalcObj->getEmployeesForPayroll();
+$calcObj = new CalculatePayrollOOP();
 
-// Proses jika tombol submit ditekan
-if (isset($_POST['proses_gaji'])) {
-    $employee_id = $_POST['employee_id'];
-    $bulan_tahun = $_POST['bulan_tahun'];
-    $gaji_pokok  = floatval($_POST['gaji_pokok']);
-    $tunjangan   = floatval($_POST['tunjangan']);
-    $potongan    = floatval($_POST['potongan']);
-    $status_cair = $_POST['status_cair']; // Menangkap status cair (dibayar / pending) dari pilihan form
-
-    // Rumus Kalkulasi Total Gaji Bersih
-    $total_gaji  = ($gaji_pokok + $tunjangan) - $potongan;
-
-    $result = $payrollCalcObj->savePayrollCalculation($employee_id, $bulan_tahun, $potongan, $total_gaji, $status_cair);
-
-    if ($result) {
-        echo "<script>alert('Perhitungan gaji berhasil disimpan dan diterbitkan!'); window.location='index.php?page=gaji';</script>";
-        exit;
-    } else {
-        echo "<script>alert('Gagal memproses perhitungan gaji.');</script>";
-    }
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $calcObj->processSavePayroll($_POST);
 }
+
+$employees = $calcObj->getEmployeesForPayroll();
 ?>
 
-<!-- START: CSS Custom Estetik Burgundy -->
+<!-- CDN SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<!-- CSS Custom Burgundy -->
 <style>
+.btn-burgundy-theme {
+  background-color: #800020;
+  color: #fff;
+  border: none;
+}
+.btn-burgundy-theme:hover {
+  background-color: #600018;
+  color: #fff;
+}
 @keyframes slideUpFade {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -74,24 +141,13 @@ if (isset($_POST['proses_gaji'])) {
 .page-header, .card {
   animation: slideUpFade 0.3s ease-in-out;
 }
-.btn-burgundy-theme {
-  background-color: #800020;
-  color: #fff;
-  border: none;
-  transition: all 0.3s ease;
-}
-.btn-burgundy-theme:hover {
-  background-color: #600018;
-  color: #fff;
-}
 </style>
-<!-- END: CSS Custom -->
 
-<!-- START: Page Header Banner -->
+<!-- Header Banner -->
 <div class="page-header mb-4">
   <div>
-    <h1 class="page-title fw-bold" style="color: #800020;">Hitung & Proses Gaji</h1>
-    <p class="page-subtitle text-muted">Kalkulasi komponen gaji pokok, tunjangan jabatan, dan potongan kehadiran karyawan secara terstruktur.</p>
+    <h1 class="page-title fw-bold" style="color: #800020;">Proses Hitung Gaji Baru</h1>
+    <p class="page-subtitle text-muted">Hitung komponen gaji pokok, tunjangan, potongan, serta informasi rekening tujuan transfer karyawan.</p>
   </div>
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb mb-0">
@@ -102,85 +158,97 @@ if (isset($_POST['proses_gaji'])) {
     </ol>
   </nav>
 </div>
-<!-- END: Page Header Banner -->
 
-<!-- START: Form Hitung Gaji Card -->
-<div class="card border-0 shadow-sm rounded-4 p-4 bg-white" style="max-width: 800px;">
-  <form method="POST" action="">
-    <div class="mb-3">
-      <label class="form-label fw-bold small text-uppercase text-muted">Pilih Karyawan</label>
-      <select name="employee_id" class="form-select rounded-3 shadow-none" required onchange="ambilDataGaji(this)">
-        <option value="" disabled selected>-- Pilih Pegawai --</option>
-        <?php while ($k = $karyawan_list->fetch_assoc()): ?>
-          <option value="<?= $k['emp_id']; ?>" data-gp="<?= $k['gaji_pokok']; ?>" data-tj="<?= $k['tunjangan']; ?>">
-            <?= htmlspecialchars($k['nama'] . ' (' . $k['nip'] . ' - ' . $k['nama_jabatan'] . ')'); ?>
-          </option>
-        <?php endwhile; ?>
-      </select>
-    </div>
+<!-- Form Card -->
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+      <form action="" method="POST" id="formHitungGaji">
+        
+        <!-- Dropdown Pilihan Karyawan -->
+        <div class="mb-3">
+          <label class="form-label fw-bold small text-uppercase text-muted">Pilih Karyawan & Rekening Tujuan</label>
+          <select name="employee_id" id="employeeSelect" class="form-select rounded-3 shadow-none border" required onchange="updateInfoRekening(this)">
+            <option value="" disabled selected>-- Pilih Nama Karyawan --</option>
+            <?php while ($emp = $employees->fetch_assoc()): ?>
+              <option value="<?= $emp['emp_id']; ?>" 
+                      data-bank="<?= htmlspecialchars($emp['nama_bank'] ?? ''); ?>" 
+                      data-rekening="<?= htmlspecialchars($emp['no_rekening'] ?? ''); ?>"
+                      data-jabatan="<?= htmlspecialchars($emp['nama_jabatan']); ?>"
+                      data-pokok="<?= $emp['gaji_pokok']; ?>"
+                      data-tunjangan="<?= $emp['tunjangan']; ?>">
+                <?= htmlspecialchars($emp['nama'] . ' (' . $emp['nip'] . ' - ' . $emp['nama_jabatan'] . ')'); ?>
+              </option>
+            <?php endwhile; ?>
+          </select>
+        </div>
 
-    <div class="mb-3">
-      <label class="form-label fw-bold small text-uppercase text-muted">Periode Bulan & Tahun</label>
-      <input type="month" name="bulan_tahun" class="form-control rounded-3 shadow-none" value="<?= date('Y-m'); ?>" required>
-    </div>
+        <!-- Box Informasi Bank & Rekening Tujuan -->
+        <div class="alert alert-light border rounded-3 p-3 mb-3 small text-secondary">
+          <i class="bi bi-info-circle-fill me-1 text-danger"></i> Tujuan Transfer Bank: 
+          <span id="infoBank" class="fw-bold text-dark">-</span> | No. Rekening: <span id="infoRekening" class="fw-bold text-dark">-</span>
+        </div>
 
-    <div class="row">
-      <div class="col-md-4 mb-3">
-        <label class="form-label fw-bold small text-uppercase text-muted">Gaji Pokok (Rp)</label>
-        <input type="number" id="gaji_pokok" name="gaji_pokok" class="form-control rounded-3 bg-light" readonly required>
-      </div>
-      <div class="col-md-4 mb-3">
-        <label class="form-label fw-bold small text-uppercase text-muted">Tunjangan (Rp)</label>
-        <input type="number" id="tunjangan" name="tunjangan" class="form-control rounded-3 bg-light" readonly required>
-      </div>
-      <div class="col-md-4 mb-3">
-        <label class="form-label fw-bold small text-uppercase text-muted">Potongan (Rp)</label>
-        <input type="number" name="potongan" id="potongan" class="form-control rounded-3 shadow-none" value="0" required onkeyup="hitungTotal()">
-      </div>
-    </div>
+        <!-- Periode Gaji -->
+        <div class="mb-3">
+          <label class="form-label fw-bold small text-uppercase text-muted">Periode Gaji (Bulan-Tahun)</label>
+          <input type="text" name="bulan_tahun" class="form-control rounded-3 shadow-none border" value="<?= date('Y-m'); ?>" required>
+        </div>
 
-    <!-- Pilihan Status Pembayaran (Dibayar / Pending) -->
-    <div class="mb-3">
-      <label class="form-label fw-bold small text-uppercase text-muted">Status Pembayaran</label>
-      <select name="status_cair" class="form-select rounded-3 shadow-none" required>
-        <option value="dibayar">Dibayar (Lunas)</option>
-        <option value="pending">Pending (Belum Dibayar)</option>
-      </select>
-    </div>
+        <!-- Gaji Pokok & Tunjangan -->
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold small text-uppercase text-muted">Gaji Pokok (Rp)</label>
+            <input type="text" id="inputPokok" class="form-control rounded-3 bg-light" readonly value="0">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold small text-uppercase text-muted">Tunjangan (Rp)</label>
+            <input type="text" id="inputTunjangan" class="form-control rounded-3 bg-light" readonly value="0">
+          </div>
+        </div>
 
-    <div class="mb-4 p-3 rounded-3 border" style="background-color: rgba(128, 0, 32, 0.03);">
-      <span class="text-muted small fw-bold text-uppercase d-block">Estimasi Total Gaji Bersih:</span>
-      <h2 class="fw-bold mb-0" style="color: #800020;" id="label_total_gaji">Rp 0</h2>
-    </div>
+        <!-- Potongan -->
+        <div class="mb-3">
+          <label class="form-label fw-bold small text-uppercase text-muted">Potongan Keterlambatan / Absensi (Rp)</label>
+          <input type="number" name="potongan" class="form-control rounded-3 shadow-none border" value="0" min="0" required>
+        </div>
 
-    <div class="d-flex gap-2">
-      <button type="submit" name="proses_gaji" class="btn btn-burgundy-theme px-4 py-2 rounded-3 shadow-sm">
-        <i class="bi bi-save me-1"></i> Simpan & Terbitkan Gaji
-      </button>
-      <a href="index.php?page=gaji" class="btn btn-light border px-4 py-2 rounded-3">Kembali</a>
+        <!-- Status Pencairan -->
+        <div class="mb-4">
+          <label class="form-label fw-bold small text-uppercase text-muted">Status Pencairan</label>
+          <select name="status_cair" class="form-select rounded-3 shadow-none border" required>
+            <option value="pending">Pending (Simpan Saja, Tanpa Notifikasi)</option>
+            <option value="dibayar">Dibayar (Kirim Notifikasi Masuk)</option>
+          </select>
+          <div class="form-text small text-muted">Jika dipilih "Dibayar", sistem akan otomatis mencatatkan notifikasi masuk ke akun karyawan.</div>
+        </div>
+
+        <!-- Tombol Aksi -->
+        <div class="d-flex justify-content-end gap-2">
+          <a href="index.php?page=gaji" class="btn btn-light border px-4 py-2 rounded-3">Batal</a>
+          <button type="submit" class="btn btn-burgundy-theme px-4 py-2 rounded-3 shadow-sm">
+            <i class="bi bi-send-fill me-1"></i> Simpan & Terbitkan Gaji
+          </button>
+        </div>
+
+      </form>
     </div>
-  </form>
+  </div>
 </div>
-<!-- END: Form Hitung Gaji Card -->
 
-<!-- SCRIPT JAVASCRIPT: Kalkulasi Otomatis Gaji Bersih -->
+<!-- JavaScript Update Rekening Terpilih -->
 <script>
-function ambilDataGaji(select) {
-    let opt = select.options[select.selectedIndex];
-    let gp = parseFloat(opt.getAttribute('data-gp')) || 0;
-    let tj = parseFloat(opt.getAttribute('data-tj')) || 0;
+function updateInfoRekening(select) {
+    let selectedOption = select.options[select.selectedIndex];
+    let bank = selectedOption.getAttribute('data-bank');
+    let rekening = selectedOption.getAttribute('data-rekening');
+    let pokok = selectedOption.getAttribute('data-pokok');
+    let tunjangan = selectedOption.getAttribute('data-tunjangan');
 
-    document.getElementById('gaji_pokok').value = gp;
-    document.getElementById('tunjangan').value = tj;
-    hitungTotal();
-}
-
-function hitungTotal() {
-    let gp = parseFloat(document.getElementById('gaji_pokok').value) || 0;
-    let tj = parseFloat(document.getElementById('tunjangan').value) || 0;
-    let pot = parseFloat(document.getElementById('potongan').value) || 0;
-
-    let total = (gp + tj) - pot;
-    document.getElementById('label_total_gaji').innerText = 'Rp ' + total.toLocaleString('id-ID');
+    document.getElementById('infoBank').innerText = (bank && bank.trim() !== '') ? bank : 'Belum diatur';
+    document.getElementById('infoRekening').innerText = (rekening && rekening.trim() !== '') ? rekening : 'Belum diatur';
+    
+    document.getElementById('inputPokok').value = new Intl.NumberFormat('id-ID').format(pokok);
+    document.getElementById('inputTunjangan').value = new Intl.NumberFormat('id-ID').format(tunjangan);
 }
 </script>

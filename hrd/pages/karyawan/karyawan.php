@@ -23,10 +23,10 @@ class EmployeeManagement {
 
     /**
      * Method untuk mengambil data lengkap karyawan dengan melakukan JOIN
-     * ke tabel users dan positions.
+     * ke tabel users dan positions, termasuk nama_bank & no_rekening.
      */
     public function getEmployeesData() {
-        $query = "SELECT employees.id as emp_id, employees.nip, employees.tgl_masuk,
+        $query = "SELECT employees.id as emp_id, employees.nip, employees.tgl_masuk, employees.nama_bank, employees.no_rekening,
                          users.nama, users.email, positions.nama_jabatan 
                   FROM employees 
                   JOIN users ON employees.user_id = users.id 
@@ -108,7 +108,7 @@ $query_karyawan =$employeeObj->getEmployeesData();
 <div class="page-header mb-4">
   <div>
     <h1 class="page-title fw-bold text-dark">Manajemen Karyawan</h1>
-    <p class="page-subtitle text-muted">Kelola data pegawai aktif, NIP, relasi jabatan, dan akun login secara terstruktur.</p>
+    <p class="page-subtitle text-muted">Kelola data pegawai aktif, NIP, relasi jabatan, rekening bank, dan akun login secara terstruktur.</p>
   </div>
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb mb-0">
@@ -165,7 +165,7 @@ $query_karyawan =$employeeObj->getEmployeesData();
     <div class="table-search-box flex-grow-1" style="max-width: 350px;">
       <div class="input-group input-group-sm">
         <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-        <input type="text" id="searchKaryawanInput" class="form-control bg-light border-start-0 shadow-none" placeholder="Cari nama, NIP, email, atau jabatan...">
+        <input type="text" id="searchKaryawanInput" class="form-control bg-light border-start-0 shadow-none" placeholder="Cari nama, NIP, bank, atau jabatan...">
       </div>
     </div>
     
@@ -186,6 +186,7 @@ $query_karyawan =$employeeObj->getEmployeesData();
           <th class="py-3">NIP</th>
           <th class="py-3">Nama Karyawan</th>
           <th class="py-3">Email Akun</th>
+          <th class="py-3">Bank & No. Rekening</th>
           <th class="py-3">Jabatan</th>
           <th class="py-3">Tanggal Masuk</th>
           <th class="py-3 text-center">Actions</th>
@@ -208,6 +209,10 @@ $query_karyawan =$employeeObj->getEmployeesData();
                 </div>
               </td>
               <td class="text-muted"><?php echo htmlspecialchars($row['email'] ?? '-'); ?></td>
+              <td>
+                <span class="fw-bold text-secondary"><?php echo htmlspecialchars($row['nama_bank'] ?? 'Belum diatur'); ?></span><br>
+                <small class="text-muted"><?php echo htmlspecialchars($row['no_rekening'] ?? '-'); ?></small>
+              </td>
               <td><span class="badge-jabatan"><?php echo htmlspecialchars($row['nama_jabatan'] ?? '-'); ?></span></td>
               <td class="text-muted"><?php echo htmlspecialchars($row['tgl_masuk'] ?? '-'); ?></td>
               <td>
@@ -220,7 +225,7 @@ $query_karyawan =$employeeObj->getEmployeesData();
           <?php endwhile; ?>
         <?php else: ?>
           <tr>
-            <td colspan="7" class="text-center text-muted py-4">Belum ada data karyawan tersimpan di database.</td>
+            <td colspan="8" class="text-center text-muted py-4">Belum ada data karyawan tersimpan di database.</td>
           </tr>
         <?php endif; ?>
       </tbody>
@@ -229,7 +234,7 @@ $query_karyawan =$employeeObj->getEmployeesData();
 
   <!-- Footer Info -->
   <div class="table-footer-control mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
-    <span class="text-muted small">Menampilkan data pegawai secara real-time dari tabel relasi MySQL (`users` & `employees`)</span>
+    <span class="text-muted small">Menampilkan data pegawai secara real-time dari tabel relasi MySQL (`users` & `employees`)[cite: 6]</span>
     <span class="badge bg-light text-success border px-3 py-2 rounded-2">Status: Sinkron Aktif</span>
   </div>
 </div>
@@ -272,7 +277,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // Judul Laporan PDF
             doc.setFontSize(16);
             doc.setTextColor(40, 40, 40);
-            doc.text("Laporan Resmi Data Karyawan - E-Payroll", 14, 20);
+            doc.text("Laporan Resmi Data Karyawan & Rekening - E-Payroll", 14, 20);
             
             doc.setFontSize(10);
             doc.setTextColor(100);
@@ -287,16 +292,17 @@ document.addEventListener("DOMContentLoaded", function () {
                     { header: 'NIP', dataKey: 1 },
                     { header: 'Nama Karyawan', dataKey: 2 },
                     { header: 'Email Akun', dataKey: 3 },
-                    { header: 'Jabatan', dataKey: 4 },
-                    { header: 'Tanggal Masuk', dataKey: 5 }
+                    { header: 'Bank & Rekening', dataKey: 4 },
+                    { header: 'Jabatan', dataKey: 5 },
+                    { header: 'Tanggal Masuk', dataKey: 6 }
                 ],
                 theme: 'grid',
                 headStyles: { fillColor: [20, 52, 35] }, // Warna senada template admin
-                styles: { fontSize: 8, cellPadding: 4 }
+                styles: { fontSize: 7, cellPadding: 3 }
             });
 
             // Menyimpan file PDF
-            doc.save("laporan_data_karyawan.pdf");
+            doc.save("laporan_data_karyawan_rekening.pdf");
         });
     }
 });

@@ -1,5 +1,5 @@
 <?php
-// Tangkap parameter halaman di paling atas agar terbaca oleh sidebar
+// 3. Tangkap parameter halaman di paling atas agar terbaca oleh sidebar
 $page = isset($_GET['page']) ? $_GET['page'] : "dashboard";
 ?>
 <!DOCTYPE html>
@@ -45,9 +45,8 @@ $page = isset($_GET['page']) ? $_GET['page'] : "dashboard";
             include 'pages/penggajian/hitung.php';
             break;
        case 'terbit':
-        case 'terbit-gaji':
             include 'pages/penggajian/terbit.php'; // Tambahkan rute ini agar terbit.php terpanggil
-            break;   
+            break;
     }
     ?> 
     <!-- END: Main Content Dynamic Router -->

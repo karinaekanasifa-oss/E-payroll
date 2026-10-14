@@ -24,18 +24,19 @@
       <div class="sidebar-menu-section mb-3">
         <div class="sidebar-menu-title text-uppercase small text-muted px-3 mb-2" style="font-size: 11px; letter-spacing: 0.5px;">Komponen Keuangan</div>
         <ul class="sidebar-menu-list list-unstyled mb-0">
+           <li class="sidebar-menu-item mb-1">
+            <a href="index.php?page=laporan-gaji" class="sidebar-menu-link d-flex align-items-center px-3 py-2 rounded-3 text-decoration-none text-white transition-all <?= (isset($_GET['page']) && $_GET['page'] == 'laporan-gaji') ? 'active bg-burgundy' : ''; ?>" id="menu-laporan" title="Laporan & Slip">
+              <i class="bi bi-file-earmark-text-fill me-3 fs-5" style="color: #D4AF37;"></i>
+              <span>Laporan & Slip Gaji</span>
+            </a>
+          </li>
           <li class="sidebar-menu-item mb-1">
             <a href="index.php?page=hitung" class="sidebar-menu-link d-flex align-items-center px-3 py-2 rounded-3 text-decoration-none text-white transition-all <?= (isset($_GET['page']) && $_GET['page'] == 'hitung-gaji') ? 'active bg-burgundy' : ''; ?>" id="menu-hitung" title="Hitung Gaji">
               <i class="bi bi-calculator me-3 fs-5" style="color: #D4AF37;"></i>
               <span>Proses Hitung Gaji</span>
             </a>
           </li>
-          <li class="sidebar-menu-item mb-1">
-            <a href="index.php?page=laporan-gaji" class="sidebar-menu-link d-flex align-items-center px-3 py-2 rounded-3 text-decoration-none text-white transition-all <?= (isset($_GET['page']) && $_GET['page'] == 'laporan-gaji') ? 'active bg-burgundy' : ''; ?>" id="menu-laporan" title="Laporan & Slip">
-              <i class="bi bi-file-earmark-text-fill me-3 fs-5" style="color: #D4AF37;"></i>
-              <span>Laporan & Slip Gaji</span>
-            </a>
-          </li>
+         
           <li class="sidebar-menu-item mb-1">
             <a href="index.php?page=terbit" class="sidebar-menu-link d-flex align-items-center px-3 py-2 rounded-3 text-decoration-none text-white transition-all <?= (isset($_GET['page']) && $_GET['page'] == 'terbit') ? 'active bg-burgundy' : ''; ?>" id="menu-terbit" title="Terbit Slip">
               <i class="bi bi-printer-fill me-3 fs-5" style="color: #D4AF37;"></i>
