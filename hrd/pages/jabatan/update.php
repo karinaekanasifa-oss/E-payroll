@@ -1,7 +1,6 @@
 <main id="content" class="content py-10">
     <div class="container-fluid">
         
-        <!-- Header Banner -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
@@ -16,72 +15,71 @@
             </div>
         </div>
 
-        <!-- Form Card Layout -->
         <div class="row">
             <div class="col-12">
                 <div class="card border-light shadow-sm">
                     <div class="card-body p-4">
                         
                         <?php
-                        // Memanggil file function class jabatan
                         require_once 'function/jabatan.php';
 
-                        // Instansiasi objek dari Class Jabatan
                         $jabatanObj = new Jabatan();
 
-                        // Mengambil parameter ID dari URL (contoh: index.php?page=edit-jabatan&id=1)
-                        $id = isset($_GET['id']) ? $_GET['id'] : '';
+                        // Type Casting ID agar tidak bisa disisipi SQL Injection via URL
+                        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
                         
-                        // Mengambil data lama berdasarkan ID untuk ditampilkan ke form
                         $data = $jabatanObj->ambilDataById($id);
 
-                        // Jika data tidak ditemukan di database, kembalikan ke halaman utama jabatan
                         if (!$data) {
                             echo "<script>window.location.href='index.php?page=jabatan';</script>";
                             exit;
                         }
 
-                        // Proses saat tombol update ditekan
+                        if (empty($_SESSION['csrf_token'])) {
+                            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                        }
+
                         if (isset($_POST['update_jabatan'])) {
-                            $nama_jabatan = $_POST['nama_jabatan'];
-                            $gaji_pokok   = $_POST['gaji_pokok'];
-                            $tunjangan    = $_POST['tunjangan'];
-
-                            // Memanggil method update dari class Jabatan
-                            $result = $jabatanObj->update($id, $nama_jabatan, $gaji_pokok, $tunjangan);
-
-                            if ($result) {
-                                echo "<script>window.location.href='index.php?page=jabatan';</script>";
+                            // Validasi CSRF Token
+                            if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+                                echo "<div class='alert alert-danger'>Validasi Keamanan Gagal (CSRF Token Invalid).</div>";
                             } else {
-                                echo "<div class='alert alert-danger'>Data jabatan gagal diperbarui.</div>";
+                                $nama_jabatan = $_POST['nama_jabatan'];
+                                $gaji_pokok   = $_POST['gaji_pokok'];
+                                $tunjangan    = $_POST['tunjangan'];
+
+                                $result = $jabatanObj->update($id, $nama_jabatan, $gaji_pokok, $tunjangan);
+
+                                if ($result) {
+                                    echo "<script>window.location.href='index.php?page=jabatan';</script>";
+                                } else {
+                                    echo "<div class='alert alert-danger'>Data jabatan gagal diperbarui.</div>";
+                                }
                             }
                         }
                         ?>
 
-                        <!-- Form Edit Input -->
                         <form method="POST" action="">
+                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                             
                             <div class="mb-3">
                                 <label for="nama_jabatan" class="form-label fw-bold">Nama Jabatan</label>
-                                <!-- Nilai lama otomatis ditampilkan di dalam value menggunakan htmlspecialchars -->
-                                <input type="text" class="form-control" name="nama_jabatan" id="nama_jabatan" value="<?php echo htmlspecialchars($data['nama_jabatan']); ?>" placeholder="Masukkan nama jabatan..." required>
+                                <input type="text" class="form-control" name="nama_jabatan" id="nama_jabatan" value="<?php echo htmlspecialchars($data['nama_jabatan'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" placeholder="Masukkan nama jabatan..." required>
                             </div>
 
-                            <!-- Input Gaji Pokok (Dilengkapi number_format agar titik ribuan muncul otomatis sesuai data lama) -->
                             <div class="mb-3">
                                 <label for="gaji_pokok" class="form-label fw-bold">Gaji Pokok</label>
                                 <div class="input-group">
                                     <span class="input-group-text">Rp</span>
-                                    <input type="text" class="form-control" name="gaji_pokok" id="gaji_pokok" value="<?php echo number_format($data['gaji_pokok'], 0, ',', '.'); ?>" placeholder="Contoh: 4.000.000" required>
+                                    <input type="text" class="form-control" name="gaji_pokok" id="gaji_pokok" value="<?php echo number_format((int)($data['gaji_pokok'] ?? 0), 0, ',', '.'); ?>" placeholder="Contoh: 4.000.000" required>
                                 </div>
                             </div>
 
-                            <!-- Input Tunjangan (Dilengkapi number_format agar titik ribuan muncul otomatis sesuai data lama) -->
                             <div class="mb-4">
                                 <label for="tunjangan" class="form-label fw-bold">Tunjangan</label>
                                 <div class="input-group">
                                     <span class="input-group-text">Rp</span>
-                                    <input type="text" class="form-control" name="tunjangan" id="tunjangan" value="<?php echo number_format($data['tunjangan'], 0, ',', '.'); ?>" placeholder="Contoh: 500.000" required>
+                                    <input type="text" class="form-control" name="tunjangan" id="tunjangan" value="<?php echo number_format((int)($data['tunjangan'] ?? 0), 0, ',', '.'); ?>" placeholder="Contoh: 500.000" required>
                                 </div>
                             </div>
 
@@ -100,7 +98,6 @@
     </div>
 </main>
 
-<!-- SCRIPT JAVASCRIPT: OTOMATIS MEMBUAT TITIK RIBUAN SAAT DIKETIK -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const inputGaji = document.getElementById('gaji_pokok');

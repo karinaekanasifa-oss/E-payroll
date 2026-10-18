@@ -58,12 +58,16 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
     </div>
 
     <!-- Sidebar Profile Card (Dynamic Footer) -->
-    <div class="sidebar-profile">
-      <img src="template/assets/images/avatar.png" alt="Administrator" class="sidebar-profile-img"
-        onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop'">
-      <div class="sidebar-profile-info">
-        <div class="sidebar-profile-name">Administrator</div>
-        <div class="sidebar-profile-email">admin@email.com</div>
-      </div>
+  <!-- Bagian Profil User di Sidebar Bawah -->
+<div class="sidebar-profile-box p-3 m-3 rounded-3 border border-secondary border-opacity-25 bg-dark bg-opacity-50">
+    <div class="d-flex align-items-center">
+        <div class="avatar-initial rounded-circle bg-success text-white fw-bold d-flex align-items-center justify-content-center me-2 shadow-sm flex-shrink-0" style="width: 40px; height: 40px; font-size: 15px;">
+            <?= htmlspecialchars($user_inisial ?? 'A'); ?>
+        </div>
+        <div class="overflow-hidden">
+            <h6 class="mb-0 text-white fw-bold text-truncate" style="font-size: 0.9rem;"><?= htmlspecialchars($user_nama ?? 'Administrator'); ?></h6>
+            <span class="text-muted text-truncate d-block" style="font-size: 0.75rem;"><?= htmlspecialchars($user_email ?? 'admin@email.com'); ?></span>
+        </div>
     </div>
+</div>
 </div>

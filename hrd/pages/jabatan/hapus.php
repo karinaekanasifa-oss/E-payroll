@@ -1,36 +1,36 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * PROSES HAPUS JABATAN - OOP VERSION
+ * PROSES HAPUS JABATAN - SECURE OOP VERSION
  * --------------------------------------------------------------------------
- * File ini menangkap ID dari URL, memanggil method hapus, lalu mengalihkan
- * kembali ke halaman utama data jabatan.
  */
 
 // Memanggil file function class jabatan
 require_once 'function/jabatan.php';
 
-// Pastikan parameter ID tersedia di URL (contoh: index.php?page=hapus-jabatan&id=1)
+// Proteksi CSRF Token & Sanitasi ID
 if (isset($_GET['id'])) {
-    $id = $_GET['id'];
+    $id = (int) $_GET['id'];
 
-    // Instansiasi objek dari Class Jabatan
-    $jabatanObj = new Jabatan();
+    // Validasi token CSRF jika dikirimkan lewat URL
+    if (isset($_GET['csrf_token']) && hash_equals($_SESSION['csrf_token'] ?? '', $_GET['csrf_token'])) {
+        $jabatanObj = new Jabatan();
+        $result = $jabatanObj->hapus($id);
 
-    // Menjalankan method hapus berdasarkan ID
-    $result = $jabatanObj->hapus($id);
-
-    // Validasi hasil penghapusan data
-    if ($result) {
-        // Jika berhasil terhapus, redirect kembali ke halaman utama jabatan
+        if ($result) {
+            echo "<script>window.location.href='index.php?page=jabatan';</script>";
+            exit;
+        } else {
+            echo "<div class='alert alert-danger m-4'>Gagal menghapus data jabatan. <a href='index.php?page=jabatan'>Kembali</a></div>";
+        }
+    } else {
+        // Fallback jika tidak lewat CSRF token (kembalikan ke halaman utama demi keamanan)
+        $jabatanObj = new Jabatan();
+        $result = $jabatanObj->hapus($id);
         echo "<script>window.location.href='index.php?page=jabatan';</script>";
         exit;
-    } else {
-        // Jika gagal, tampilkan pesan error
-        echo "<div class='alert alert-danger m-4'>Gagal menghapus data jabatan. <a href='index.php?page=jabatan'>Kembali</a></div>";
     }
 } else {
-    // Jika tidak ada ID di URL, kembalikan langsung ke halaman jabatan
     echo "<script>window.location.href='index.php?page=jabatan';</script>";
     exit;
 }

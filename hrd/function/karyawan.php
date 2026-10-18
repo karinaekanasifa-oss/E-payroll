@@ -27,20 +27,14 @@ class Karyawan
         $role,
         $nip,
         $position_id,
-        $tgl_masuk
+        $tgl_masuk,
+        $nama_bank,
+        $no_rekening
     ) {
 
-        // Mencegah celah keamanan SQL Injection dengan membersihkan karakter khusus pada input nama
-        $var_nama = mysqli_real_escape_string(
-            $this->conn,
-            $nama
-        );
-        
-        // Mencegah celah keamanan SQL Injection pada input email
-        $var_email = mysqli_real_escape_string(
-            $this->conn,
-            $email
-        );
+        // Pembersihan XSS & Sanitasi Data
+        $var_nama = htmlspecialchars(trim($nama), ENT_QUOTES, 'UTF-8');
+        $var_email = filter_var(trim($email), FILTER_SANITIZE_EMAIL);
         
         // Melakukan enkripsi password (hashing) sebelum disimpan ke database agar aman
         $var_password = password_hash(
@@ -48,62 +42,33 @@ class Karyawan
             PASSWORD_DEFAULT
         );
         
-        // Mencegah celah keamanan SQL Injection pada input role
-        $var_role = mysqli_real_escape_string(
-            $this->conn,
-            $role
-        );
+        // Validasi pembatasan role yang diperbolehkan
+        $role_input = strtolower(trim($role));
+        $allowed_roles = ['karyawan', 'hrd', 'finance'];
+        $var_role = in_array($role_input, $allowed_roles) ? $role_input : 'karyawan';
 
-        // Mencegah celah keamanan SQL Injection pada input nip
-        $var_nip = mysqli_real_escape_string(
-            $this->conn,
-            $nip
-        );
-
-        // Mencegah celah keamanan SQL Injection pada input position_id
-        $var_position_id = mysqli_real_escape_string(
-            $this->conn,
-            $position_id
-        );
-
-        // Mencegah celah keamanan SQL Injection pada input tgl_masuk
-        $var_tgl_masuk = mysqli_real_escape_string(
-            $this->conn,
-            $tgl_masuk
-        );
+        $var_nip = htmlspecialchars(trim($nip), ENT_QUOTES, 'UTF-8');
+        $var_position_id = (int) $position_id; // Type-casting integer untuk keamanan ID
+        $var_tgl_masuk = trim($tgl_masuk);
+        $var_nama_bank = htmlspecialchars(trim($nama_bank), ENT_QUOTES, 'UTF-8');
+        $var_no_rekening = htmlspecialchars(trim($no_rekening), ENT_QUOTES, 'UTF-8');
 
         // Memulai transaksi database karena data masuk ke dua tabel berbeda secara berelasi (users & employees)
         mysqli_begin_transaction($this->conn);
 
         try {
-            // 1. Menulis perintah SQL (Query) untuk memasukkan data akun ke tabel 'users'
-            $queryUser = "INSERT INTO users 
-                          (nama, email, password, role)
-                          VALUES (
-                          '$var_nama',
-                          '$var_email',
-                          '$var_password',
-                          '$var_role'
-                          )";
-            
-            // Menjalankan query ke tabel users
-            mysqli_query($this->conn, $queryUser);
+            // 1. Menggunakan Prepared Statement untuk memasukkan data akun ke tabel 'users' (Mencegah SQL Injection)
+            $stmtUser = $this->conn->prepare("INSERT INTO users (nama, email, password, role) VALUES (?, ?, ?, ?)");
+            $stmtUser->bind_param("ssss", $var_nama, $var_email, $var_password, $var_role);
+            $stmtUser->execute();
             
             // Mengambil ID terakhir dari tabel users yang baru saja di-generate secara otomatis (Auto Increment)
             $user_id = mysqli_insert_id($this->conn);
 
-            // 2. Menulis perintah SQL (Query) untuk memasukkan data detail ke tabel 'employees'
-            $queryEmp = "INSERT INTO employees 
-                          (user_id, position_id, nip, tgl_masuk)
-                          VALUES (
-                          '$user_id',
-                          '$var_position_id',
-                          '$var_nip',
-                          '$var_tgl_masuk'
-                          )";
-
-            // Menjalankan query ke tabel employees
-            mysqli_query($this->conn, $queryEmp);
+            // 2. Menggunakan Prepared Statement untuk memasukkan data detail ke tabel 'employees' beserta rekening bank
+            $stmtEmp = $this->conn->prepare("INSERT INTO employees (user_id, position_id, nip, tgl_masuk, nama_bank, no_rekening) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmtEmp->bind_param("iissss", $user_id, $var_position_id, $var_nip, $var_tgl_masuk, $var_nama_bank, $var_no_rekening);
+            $stmtEmp->execute();
 
             // Jika semua query berhasil tanpa error, simpan permanen (commit) ke database
             mysqli_commit($this->conn);
@@ -116,3 +81,4 @@ class Karyawan
         }
     }
 }
+?>

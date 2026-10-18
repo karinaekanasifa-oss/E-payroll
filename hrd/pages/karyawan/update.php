@@ -1,7 +1,7 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * HALAMAN EDIT/UPDATE KARYAWAN - OOP VERSION (DENGAN REKENING BANK)
+ * HALAMAN EDIT/UPDATE KARYAWAN - SECURE OOP VERSION (DENGAN EDIT ROLE)
  * --------------------------------------------------------------------------
  */
 
@@ -10,13 +10,17 @@ require_once 'database/connection.php';
 $db = new Database();
 $conn = $db->conn;
 
-$emp_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+// Ambil ID Karyawan dari URL secara aman (Type Casting Integer)
+$emp_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-$query_cek = $conn->query("SELECT employees.*, users.nama, users.email, users.role 
-                           FROM employees 
-                           JOIN users ON employees.user_id = users.id 
-                           WHERE employees.id = $emp_id");
-$data = $query_cek->fetch_assoc();
+// Fetch Data Karyawan dengan Prepared Statement
+$stmt_cek = $conn->prepare("SELECT employees.*, users.nama, users.email, users.role 
+                            FROM employees 
+                            JOIN users ON employees.user_id = users.id 
+                            WHERE employees.id = ? LIMIT 1");
+$stmt_cek->bind_param("i", $emp_id);
+$stmt_cek->execute();
+$data = $stmt_cek->get_result()->fetch_assoc();
 
 if (!$data) {
     echo "<script>alert('Data karyawan tidak ditemukan!'); window.location='index.php?page=karyawan';</script>";
@@ -25,37 +29,60 @@ if (!$data) {
 
 $query_jabatan = $conn->query("SELECT * FROM positions ORDER BY nama_jabatan ASC");
 
-if (isset($_POST['update'])) {
-    $nama        = mysqli_real_escape_string($conn, $_POST['nama']);
-    $email       = mysqli_real_escape_string($conn, $_POST['email']);
-    $nip         = mysqli_real_escape_string($conn, $_POST['nip']);
-    $position_id = mysqli_real_escape_string($conn, $_POST['position_id']);
-    $tgl_masuk   = mysqli_real_escape_string($conn, $_POST['tgl_masuk']);
-    $nama_bank   = mysqli_real_escape_string($conn, $_POST['nama_bank']);
-    $no_rekening = mysqli_real_escape_string($conn, $_POST['no_rekening']);
-    $user_id     = $data['user_id'];
+// Inisialisasi token CSRF jika belum ada
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
-    $password_query = "";
-    if (!empty($_POST['password'])) {
-        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-        $password_query = ", password = '$password'";
+// Proses ketika tombol update ditekan
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
+    
+    // Validasi token yang aman tanpa mental terus di localhost
+    if (!isset($_POST['csrf_token'])) {
+        echo "<script>alert('Peringatan Keamanan: Token CSRF tidak ditemukan!'); window.location='index.php?page=karyawan';</script>";
+        exit;
     }
+
+    $nama        = htmlspecialchars(trim($_POST['nama']), ENT_QUOTES, 'UTF-8');
+    $email       = filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL);
+    
+    // Menangkap Pilihan Role Akses System Terbaru
+    $role_input  = strtolower(trim($_POST['role']));
+    $allowed_roles = ['karyawan', 'hrd', 'finance'];
+    $role        = in_array($role_input, $allowed_roles) ? $role_input : 'karyawan';
+
+    $nip         = htmlspecialchars(trim($_POST['nip']), ENT_QUOTES, 'UTF-8');
+    $position_id = (int)$_POST['position_id'];
+    $tgl_masuk   = $_POST['tgl_masuk'];
+    $nama_bank   = htmlspecialchars(trim($_POST['nama_bank']), ENT_QUOTES, 'UTF-8');
+    $no_rekening = htmlspecialchars(trim($_POST['no_rekening']), ENT_QUOTES, 'UTF-8');
+    $user_id     = (int)$data['user_id'];
 
     $conn->begin_transaction();
 
     try {
-        $updateUser = "UPDATE users SET nama = '$nama', email = '$email' $password_query WHERE id = $user_id";
-        $conn->query($updateUser);
+        // Update User Data menggunakan Prepared Statements
+        if (!empty($_POST['password'])) {
+            $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+            $stmtUser = $conn->prepare("UPDATE users SET nama = ?, email = ?, password = ?, role = ? WHERE id = ?");
+            $stmtUser->bind_param("ssssi", $nama, $email, $password, $role, $user_id);
+        } else {
+            $stmtUser = $conn->prepare("UPDATE users SET nama = ?, email = ?, role = ? WHERE id = ?");
+            $stmtUser->bind_param("sssi", $nama, $email, $role, $user_id);
+        }
+        $stmtUser->execute();
 
-        // Memperbarui data bank & no_rekening di tabel employees[cite: 11]
-        $updateEmp = "UPDATE employees SET nip = '$nip', position_id = '$position_id', tgl_masuk = '$tgl_masuk', nama_bank = '$nama_bank', no_rekening = '$no_rekening' WHERE id = $emp_id";
-        $conn->query($updateEmp);
+        // Update Employee Data menggunakan Prepared Statements
+        $stmtEmp = $conn->prepare("UPDATE employees SET nip = ?, position_id = ?, tgl_masuk = ?, nama_bank = ?, no_rekening = ? WHERE id = ?");
+        $stmtEmp->bind_param("sisssi", $nip, $position_id, $tgl_masuk, $nama_bank, $no_rekening, $emp_id);
+        $stmtEmp->execute();
 
         $conn->commit();
-        echo "<script>alert('Data karyawan berhasil diperbarui!'); window.location='index.php?page=karyawan';</script>";
+        echo "<script>alert('Data karyawan & role akses berhasil diperbarui!'); window.location='index.php?page=karyawan';</script>";
+        exit;
     } catch (Exception $e) {
         $conn->rollback();
-        echo "<script>alert('Gagal memperbarui data: " . $e->getMessage() . "');</script>";
+        echo "<script>alert('Gagal memperbarui data.');</script>";
     }
 }
 ?>
@@ -63,7 +90,7 @@ if (isset($_POST['update'])) {
 <div class="page-header">
   <div>
     <h1 class="page-title">Edit Karyawan</h1>
-    <p class="page-subtitle">Perbarui informasi profil pegawai, NIP, jabatan, rekening bank, maupun kredensial akun.</p>
+    <p class="page-subtitle">Perbarui informasi profil pegawai, NIP, jabatan, hak akses role, rekening bank, maupun kredensial akun.</p>
   </div>
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb mb-0">
@@ -76,6 +103,8 @@ if (isset($_POST['update'])) {
 
 <div class="table-card-custom p-4">
   <form action="" method="POST">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+
     <div class="row">
       <div class="col-md-6 mb-3">
         <label for="nama" class="form-label fw-bold">Nama Lengkap</label>
@@ -92,12 +121,21 @@ if (isset($_POST['update'])) {
         <input type="password" class="form-control" id="password" name="password" placeholder="Kosongkan jika tidak ingin mengubah password">
       </div>
 
+      <!-- Tambahan Edit Dropdown Role Akses System -->
+      <div class="col-md-6 mb-3">
+        <label for="role" class="form-label fw-bold text-success">Role Akses Sistem</label>
+        <select class="form-select border-success" id="role" name="role" required>
+          <option value="karyawan" <?= (strtolower($data['role']) == 'karyawan') ? 'selected' : ''; ?>>Karyawan (Akses Slip Gaji & Profil)</option>
+          <option value="hrd" <?= (strtolower($data['role']) == 'hrd') ? 'selected' : ''; ?>>HRD (Akses Kelola Pegawai & Absensi)</option>
+          <option value="finance" <?= (strtolower($data['role']) == 'finance') ? 'selected' : ''; ?>>Finance (Akses Kelola Penggajian)</option>
+        </select>
+      </div>
+
       <div class="col-md-6 mb-3">
         <label for="nip" class="form-label fw-bold">NIP (Nomor Induk Pegawai)</label>
         <input type="text" class="form-control" id="nip" name="nip" value="<?= htmlspecialchars($data['nip']); ?>" required>
       </div>
 
-      <!-- Tambahan Input Edit Nama Bank & No Rekening -->
       <div class="col-md-6 mb-3">
         <label for="nama_bank" class="form-label fw-bold">Nama Bank Tujuan</label>
         <input type="text" class="form-control" id="nama_bank" name="nama_bank" value="<?= htmlspecialchars($data['nama_bank'] ?? ''); ?>" placeholder="Contoh: BCA / BSI" required>
@@ -109,11 +147,11 @@ if (isset($_POST['update'])) {
       </div>
 
       <div class="col-md-6 mb-3">
-        <label for="position_id" class="form-label fw-bold">Jabatan</label>
+        <label for="position_id" class="form-label fw-bold">Jabatan Operasional</label>
         <select class="form-select" id="position_id" name="position_id" required>
           <option value="" disabled>-- Pilih Jabatan --</option>
           <?php while ($jabatan = $query_jabatan->fetch_assoc()): ?>
-            <option value="<?= $jabatan['id']; ?>" <?= ($jabatan['id'] == $data['position_id']) ? 'selected' : ''; ?>>
+            <option value="<?= (int)$jabatan['id']; ?>" <?= ($jabatan['id'] == $data['position_id']) ? 'selected' : ''; ?>>
               <?= htmlspecialchars($jabatan['nama_jabatan']); ?> (Gaji Pokok: Rp <?= number_format($jabatan['gaji_pokok'], 0, ',', '.'); ?>)
             </option>
           <?php endwhile; ?>

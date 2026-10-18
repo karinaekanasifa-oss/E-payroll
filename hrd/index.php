@@ -1,47 +1,51 @@
 <?php
+/**
+ * --------------------------------------------------------------------------
+ * MAIN INDEX HRD MODULE - E-PAYROLL SYSTEM
+ * --------------------------------------------------------------------------
+ */
+
+// Panggil Auth untuk proteksi login & session management
+require_once '../login/classes/auth.php';
+$auth = new Auth();
+
+// Wajibkan user login & batasi hanya role 'hrd' yang bisa masuk
+$auth->requireLogin();
+$auth->restrictRole('hrd');
+
+// Ambil data user aktif dari Session
+$user_nama     = $_SESSION['nama'] ?? 'Administrator';
+$user_email    = $_SESSION['email'] ?? 'admin@email.com';
+$user_role     = $_SESSION['role'] ?? 'hrd';
+$user_inisial  = strtoupper(substr($user_nama, 0, 1));
+
 // Tangkap parameter halaman di paling atas agar terbaca oleh sidebar
 $page = isset($_GET['page']) ? $_GET['page'] : "dashboard";
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 
 <!-- head --> 
- <?php include 'partials/head.php'; ?>
+<?php include 'partials/head.php'; ?>
 <!-- head -->
 
 <body>
 
-  <!-- ==========================================
-         START: Sidebar Component
-         Highly polished, dark-green sticky navigation
-         ========================================== -->
-    <?php include 'components/sidebar.php'; ?>
-  <!-- ==========================================
-         END: Sidebar Component
-         ========================================== -->
+  <!-- START: Sidebar Component -->
+  <?php include 'components/sidebar.php'; ?>
+  <!-- END: Sidebar Component -->
 
-
-  <!-- ==========================================
-         START: Main Content Area
-         ========================================== -->
   <div class="main-wrapper">
 
     <!-- START: Top Navbar Component -->
-     <?php include 'components/topbar.php'; ?>
+    <?php include 'components/topbar.php'; ?>
     <!-- END: Top Navbar Component -->
 
-    <!-- START: Dashboard Header Banner -->
-      <!-- MAIN CONTENT -->
-    <!-- Fungsinya untuk menampilkan halaman hanya dibagian main content saja -->
+    <!-- MAIN CONTENT -->
     <?php
     switch ($page) {
-        // Untuk memberi nama halamannya
-        // Dashboard
         case 'dashboard':
-            // isinya apa / mau diisi dengan bagian pages apa
             include 'pages/dashboard.php';
-            // Fungsinya untuk menahan halaman agar tidak 
-            // otomatis berpindah ke halaman setelahnya
             break;
         case 'jabatan':
             include 'pages/jabatan/jabatan.php';
@@ -82,31 +86,24 @@ $page = isset($_GET['page']) ? $_GET['page'] : "dashboard";
         case 'absensi':
             include 'pages/absensi/absensi.php';
             break;
-        //case 'tambah-absensi':
-          //  include 'pages/absensi/tambah.php';
-           // break;
         case 'edit-absensi':
             include 'pages/absensi/update.php';
             break;
         case 'hapus-absensi':
             include 'pages/absensi/hapus.php';
             break;
-
+        default:
+            include 'pages/dashboard.php';
+            break;
     }
     ?>
-    <!-- END: Main Layout Grid -->
 
     <!-- START: Footer Component -->
     <?php include 'components/footer.php'; ?>
     <!-- END: Footer Component -->
 
   </div>
-  <!-- ==========================================
-         END: Main Content Area
-         ========================================== -->
 
-  <!-- Local Third-Party Libraries Script dependencies -->
   <?php include 'partials/script.php'; ?>
 </body>
-
 </html>

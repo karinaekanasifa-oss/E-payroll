@@ -5,11 +5,7 @@
  * --------------------------------------------------------------------------
  */
 
-if (file_exists('classes/Auth.php')) {
-    require_once 'classes/Auth.php';
-} elseif (file_exists('../classes/Auth.php')) {
-    require_once '../classes/Auth.php';
-}
+require_once 'classes/auth.php';
 
 $auth = new Auth();
 $auth->logout();

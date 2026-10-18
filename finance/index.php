@@ -1,4 +1,17 @@
 <?php
+/**
+ * --------------------------------------------------------------------------
+ * PROTEKSI KEAMANAN OPERASIONAL & ROUTER UTAMA (FINANCE)
+ * --------------------------------------------------------------------------
+ */
+
+// 1. Panggil class Auth dari folder login/classes
+require_once '../login/classes/auth.php';
+
+// 2. Inisialisasi dan kunci halaman khusus untuk role Finance
+$auth = new Auth();
+$auth->restrictRole('finance');
+
 // 3. Tangkap parameter halaman di paling atas agar terbaca oleh sidebar
 $page = isset($_GET['page']) ? $_GET['page'] : "dashboard";
 ?>

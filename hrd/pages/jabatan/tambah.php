@@ -1,7 +1,6 @@
 <main id="content" class="content py-10">
     <div class="container-fluid">
         
-        <!-- Header Banner -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
@@ -16,45 +15,48 @@
             </div>
         </div>
 
-        <!-- Form Card Layout -->
         <div class="row">
             <div class="col-12">
                 <div class="card border-light shadow-sm">
                     <div class="card-body p-4">
                         
                         <?php
-                        // Memanggil file function class jabatan
                         require_once 'function/jabatan.php';
 
-                        // Proses saat tombol submit ditekan
+                        if (empty($_SESSION['csrf_token'])) {
+                            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                        }
+
                         if (isset($_POST['submit_jabatan'])) {
-                            // Instansiasi objek dari Class Jabatan
-                            $jabatanObj = new Jabatan();
-
-                            $nama_jabatan = $_POST['nama_jabatan'];
-                            $gaji_pokok   = $_POST['gaji_pokok'];
-                            $tunjangan    = $_POST['tunjangan'];
-
-                            // Memanggil method tambah dari class Jabatan
-                            $result = $jabatanObj->tambah($nama_jabatan, $gaji_pokok, $tunjangan);
-
-                            if ($result) {
-                                echo "<script>window.location.href='index.php?page=jabatan';</script>";
+                            // Validasi CSRF Token
+                            if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+                                echo "<div class='alert alert-danger'>Validasi Keamanan Gagal (CSRF Token Invalid).</div>";
                             } else {
-                                echo "<div class='alert alert-danger'>Data jabatan gagal ditambahkan.</div>";
+                                $jabatanObj = new Jabatan();
+
+                                $nama_jabatan = $_POST['nama_jabatan'];
+                                $gaji_pokok   = $_POST['gaji_pokok'];
+                                $tunjangan    = $_POST['tunjangan'];
+
+                                $result = $jabatanObj->tambah($nama_jabatan, $gaji_pokok, $tunjangan);
+
+                                if ($result) {
+                                    echo "<script>window.location.href='index.php?page=jabatan';</script>";
+                                } else {
+                                    echo "<div class='alert alert-danger'>Data jabatan gagal ditambahkan.</div>";
+                                }
                             }
                         }
                         ?>
 
-                        <!-- Form Input -->
                         <form method="POST" action="">
+                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                             
                             <div class="mb-3">
                                 <label for="nama_jabatan" class="form-label fw-bold">Nama Jabatan</label>
                                 <input type="text" class="form-control" name="nama_jabatan" id="nama_jabatan" placeholder="Masukkan nama jabatan..." required>
                             </div>
 
-                            <!-- Input Gaji Pokok (Tipe text agar format titik ribuan otomatis aktif) -->
                             <div class="mb-3">
                                 <label for="gaji_pokok" class="form-label fw-bold">Gaji Pokok</label>
                                 <div class="input-group">
@@ -63,7 +65,6 @@
                                 </div>
                             </div>
 
-                            <!-- Input Tunjangan (Tipe text agar format titik ribuan otomatis aktif) -->
                             <div class="mb-4">
                                 <label for="tunjangan" class="form-label fw-bold">Tunjangan</label>
                                 <div class="input-group">
@@ -87,7 +88,6 @@
     </div>
 </main>
 
-<!-- SCRIPT JAVASCRIPT: OTOMATIS MEMBUAT TITIK RIBUAN SAAT DIKETIK -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const inputGaji = document.getElementById('gaji_pokok');

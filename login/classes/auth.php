@@ -1,16 +1,16 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * SECURE AUTHENTICATION CLASS - E-PAYROLL SYSTEM
+ * ADVANCED SECURITY AUTHENTICATION CLASS - E-PAYROLL SYSTEM
  * --------------------------------------------------------------------------
  */
 
 if (file_exists('../database/connection.php')) {
     require_once '../database/connection.php';
-} elseif (file_exists('database/connection.php')) {
-    require_once 'database/connection.php';
 } elseif (file_exists('../../database/connection.php')) {
     require_once '../../database/connection.php';
+} elseif (file_exists('database/connection.php')) {
+    require_once 'database/connection.php';
 }
 
 class Auth {
@@ -20,7 +20,6 @@ class Auth {
         $db = new Database();
         $this->conn = $db->conn;
 
-        // Inisialisasi pengaturan session yang aman
         if (session_status() === PHP_SESSION_NONE) {
             session_set_cookie_params([
                 'lifetime' => 0,
@@ -34,7 +33,6 @@ class Auth {
         }
     }
 
-    // 1. Generate CSRF Token
     public function generateCsrfToken() {
         if (empty($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -42,7 +40,6 @@ class Auth {
         return $_SESSION['csrf_token'];
     }
 
-    // 2. Verifikasi CSRF Token
     private function verifyCsrfToken($token) {
         if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
             return false;
@@ -50,7 +47,6 @@ class Auth {
         return true;
     }
 
-    // 3. Rate Limiting / Brute-Force Protection
     private function checkRateLimit() {
         if (!isset($_SESSION['login_attempts'])) {
             $_SESSION['login_attempts'] = 0;
@@ -58,7 +54,7 @@ class Auth {
         }
 
         if ($_SESSION['login_attempts'] >= 5) {
-            $lockout_duration = 30; // Blokir selama 30 detik
+            $lockout_duration = 30;
             $time_left = $lockout_duration - (time() - $_SESSION['lockout_time']);
             
             if ($time_left > 0) {
@@ -70,7 +66,6 @@ class Auth {
         return null;
     }
 
-    // 4. Proses Login Utama
     public function login($email, $password, $csrf_token) {
         if (!$this->verifyCsrfToken($csrf_token)) {
             return "Validasi keamanan gagal (Invalid CSRF Token).";
@@ -106,7 +101,8 @@ class Auth {
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['nama']    = $user['nama'];
                 $_SESSION['email']   = $user['email'];
-                $_SESSION['role']    = $user['role'];
+                $_SESSION['role']    = strtolower(trim($user['role']));
+                $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
 
                 $stmtEmp = $this->conn->prepare("SELECT id FROM employees WHERE user_id = ? LIMIT 1");
                 $stmtEmp->bind_param("i", $user['id']);
@@ -118,9 +114,10 @@ class Auth {
 
                 unset($_SESSION['csrf_token']);
 
-                $roleUser = strtolower(trim($user['role']));
+                $roleUser = $_SESSION['role'];
                 $namaJabatan = strtolower(trim($user['nama_jabatan'] ?? ''));
 
+                // Pengalihan Lokasi Berdasarkan Role (Keluar dari folder login/ menuju modul)
                 if ($roleUser == 'hrd' || str_contains($namaJabatan, 'hrd')) {
                     header("Location: ../hrd/index.php");
                 } elseif ($roleUser == 'finance' || str_contains($namaJabatan, 'finance')) {
@@ -141,7 +138,6 @@ class Auth {
         }
     }
 
-    // 5. Session Guard: Wajibkan Login
     public function requireLogin() {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -151,19 +147,22 @@ class Auth {
             header("Location: ../login/login.php");
             exit;
         }
-    }
 
-    // 6. Role Restriction: Batasi Hak Akses Berdasarkan Role
-    public function restrictRole($allowed_role) {
-        $this->requireLogin();
-
-        if (strtolower($_SESSION['role'] ?? '') !== strtolower($allowed_role)) {
-            echo "<script>alert('Akses ditolak! Anda tidak memiliki izin ke halaman ini.'); window.location='../login/login.php';</script>";
+        if (isset($_SESSION['user_agent']) && $_SESSION['user_agent'] !== $_SERVER['HTTP_USER_AGENT']) {
+            $this->logout();
             exit;
         }
     }
 
-    // 7. Proses Logout Aman
+    public function restrictRole($allowed_role) {
+        $this->requireLogin();
+
+        if (strtolower($_SESSION['role'] ?? '') !== strtolower($allowed_role)) {
+            echo "<script>alert('Peringatan Keamanan: Akses ilegal ditolak!'); window.location='../login/login.php';</script>";
+            exit;
+        }
+    }
+
     public function logout() {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
