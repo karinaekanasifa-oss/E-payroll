@@ -170,7 +170,6 @@ $query_shift = $shiftObj->tampilDataShift();
 
   <!-- Footer Controls -->
   <div class="table-footer-control mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
-    <span class="text-muted small">Menampilkan data shift real-time dari MySQL secara OOP</span>
     <span class="badge bg-light text-success border px-3 py-2 rounded-2">Status: Sinkron Aktif</span>
   </div>
 </div>

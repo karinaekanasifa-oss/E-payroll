@@ -5,20 +5,30 @@
  * --------------------------------------------------------------------------
  */
 
-if (file_exists('../database/connection.php')) {
-    require_once '../database/connection.php';
-} elseif (file_exists('../../database/connection.php')) {
-    require_once '../../database/connection.php';
-} elseif (file_exists('database/connection.php')) {
-    require_once 'database/connection.php';
+// Panggil file koneksi secara aman lintas modul (HRD, Finance, Karyawan)
+if (!class_exists('Database')) {
+    $paths = [
+        __DIR__ . '/../../karyawan/database/connection.php',
+        __DIR__ . '/../database/connection.php',
+        '../database/connection.php',
+        '../../karyawan/database/connection.php'
+    ];
+    foreach ($paths as $path) {
+        if (file_exists($path)) {
+            require_once $path;
+            break;
+        }
+    }
 }
 
 class Auth {
     private $conn;
 
     public function __construct() {
-        $db = new Database();
-        $this->conn = $db->conn;
+        if (class_exists('Database')) {
+            $db = new Database();
+            $this->conn = $db->conn;
+        }
 
         if (session_status() === PHP_SESSION_NONE) {
             session_set_cookie_params([
@@ -117,13 +127,15 @@ class Auth {
                 $roleUser = $_SESSION['role'];
                 $namaJabatan = strtolower(trim($user['nama_jabatan'] ?? ''));
 
-                // Pengalihan Lokasi Berdasarkan Role (Keluar dari folder login/ menuju modul)
+                // Pengalihan Lokasi Berdasarkan Role yang Aman
+                $basePath = '/E-payroll';
+
                 if ($roleUser == 'hrd' || str_contains($namaJabatan, 'hrd')) {
-                    header("Location: ../hrd/index.php");
+                    header("Location: " . $basePath . "/hrd/index.php");
                 } elseif ($roleUser == 'finance' || str_contains($namaJabatan, 'finance')) {
-                    header("Location: ../finance/index.php");
+                    header("Location: " . $basePath . "/finance/index.php");
                 } else {
-                    header("Location: ../karyawan/index.php");
+                    header("Location: " . $basePath . "/index.php");
                 }
                 exit;
             } else {
@@ -144,7 +156,7 @@ class Auth {
         }
 
         if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-            header("Location: ../login/login.php");
+            header("Location: /E-payroll/login/login.php");
             exit;
         }
 
@@ -158,7 +170,7 @@ class Auth {
         $this->requireLogin();
 
         if (strtolower($_SESSION['role'] ?? '') !== strtolower($allowed_role)) {
-            echo "<script>alert('Peringatan Keamanan: Akses ilegal ditolak!'); window.location='../login/login.php';</script>";
+            echo "<script>alert('Peringatan Keamanan: Akses ilegal ditolak!'); window.location='/E-payroll/login/login.php';</script>";
             exit;
         }
     }
@@ -179,7 +191,7 @@ class Auth {
         }
 
         session_destroy();
-        header("Location: login.php");
+        header("Location: /E-payroll/login/login.php");
         exit;
     }
 }

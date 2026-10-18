@@ -1,81 +1,65 @@
-<!DOCTYPE html>
-<html lang="en">
+<?php
+/**
+ * --------------------------------------------------------------------------
+ * MAIN INDEX KARYAWAN MODULE - E-PAYROLL SYSTEM
+ * --------------------------------------------------------------------------
+ */
 
- <!-- head -->
- <?php include 'partials/head.php'; ?>
+// Panggil Auth dari dalam folder login/classes/
+require_once 'login/classes/auth.php';
+$auth = new Auth();
+
+// Wajibkan user login & batasi hanya role 'karyawan'
+$auth->requireLogin();
+$auth->restrictRole('karyawan');
+
+// Ambil data session
+$user_id      = $_SESSION['user_id'] ?? 0;
+$employee_id  = $_SESSION['employee_id'] ?? 0;
+$user_nama    = htmlspecialchars($_SESSION['nama'] ?? 'Karyawan', ENT_QUOTES, 'UTF-8');
+$user_email   = htmlspecialchars($_SESSION['email'] ?? 'karyawan@email.com', ENT_QUOTES, 'UTF-8');
+$user_role    = htmlspecialchars($_SESSION['role'] ?? 'karyawan', ENT_QUOTES, 'UTF-8');
+
+// Tangkap parameter halaman dari URL (default ke 'dashboard')
+$page = isset($_GET['page']) ? $_GET['page'] : "dashboard";
+?>
+<!DOCTYPE html>
+<html lang="id">
+
+<?php include 'karyawan/partials/head.php'; ?>
 
 <body>
     <!-- Spinner Start -->
-    <?php include 'components/spinner.php'; ?>
+    <?php include 'karyawan/components/spinner.php'; ?>
     <!-- Spinner End -->
 
-
     <!-- Topbar Start -->
-    <?php include 'components/topbar.php'; ?>
+    <?php include 'karyawan/components/topbar.php'; ?>
     <!-- Topbar End -->
 
-
     <!-- Navbar Start -->
-    <?php include 'components/navbar.php'; ?>
+    <?php include 'karyawan/components/navbar.php'; ?>
     <!-- Navbar End -->
 
-
-    <!-- Hero Start -->
-    <?php include 'pages/hero.php'; ?>
-    <!-- Hero End -->
-
-
-    <!-- Video Modal Start -->
-    <?php include 'pages/video.php'; ?>
-    <!-- Video Modal End -->
-
-
-    <!-- About Start -->
-    <?php include 'pages/about.php'; ?>
-    <!-- About End -->
-
-
-    <!-- Facts Start -->
-    <?php include 'pages/facts.php'; ?>
-    <!-- Facts End -->
-
-
-    <!-- Service Start -->
-    <?php include 'pages/service.php'; ?>
-    <!-- Service End -->
-
-
-    <!-- Appointment Start -->
-    <?php include 'pages/appointment.php'; ?>
-    <!-- Appointment End -->
-
-
-    <!-- Team Start -->
-    <?php include 'pages/team.php'; ?>
-    <!-- Team End -->
-
-
-    <!-- Testimonial Start -->
-    <?php include 'pages/testimonial.php'; ?>
-    <!-- Testimonial End -->
-
-
-    <!-- Instagram Start -->
-    <?php include 'pages/instagram.php'; ?>
-    <!-- Instagram End -->
-
+    <!-- MAIN CONTENT SWITCHER -->
+    <?php
+    switch ($page) {
+        case 'dashboard':
+            include 'karyawan/pages/dashboard.php';
+            break;
+        case 'presensi':
+            include 'karyawan/pages/presensi/presensi.php';
+            break;
+        case 'izin':
+            include 'karyawan/pages/presensi/izin.php';
+            break;
+    }
+    ?>
 
     <!-- Footer Start -->
-    <?php include 'components/footer.php'; ?>
+    <?php include 'karyawan/components/footer.php'; ?>
     <!-- Footer End -->
 
-
-    <!-- Back to Top -->
-    <a href="#" class="btn btn-lg btn-primary btn-lg-square back-to-top"><i class="bi bi-arrow-up"></i></a>
-
-
-    <!-- JavaScript Libraries -->
-    <?php include 'partials/script.php'; ?>
+    <?php include 'karyawan/partials/script.php'; ?>
 </body>
-
 </html>

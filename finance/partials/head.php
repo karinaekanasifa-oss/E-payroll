@@ -1,7 +1,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spark Admin - Premium Bootstrap 5 Admin Dashboard Template</title>
+  <title>DASHBOARD - E-Payroll Finance</title>
 
   <!-- SEO Optimization -->
   <meta name="description" content="Spark Admin - Premium Bootstrap 5 Admin Dashboard Template">
