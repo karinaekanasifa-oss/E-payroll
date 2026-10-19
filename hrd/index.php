@@ -92,6 +92,9 @@ $page = isset($_GET['page']) ? $_GET['page'] : "dashboard";
         case 'hapus-absensi':
             include 'pages/absensi/hapus.php';
             break;
+        case 'izin':
+            include 'pages/izin/izin.php';
+            break;
         default:
             include 'pages/dashboard.php';
             break;

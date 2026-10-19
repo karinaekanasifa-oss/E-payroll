@@ -1,27 +1,29 @@
 <?php
+if (!class_exists('Database')) {
+    class Database {
+        private $host = "localhost";
+        private $username = "root";
+        private $password = "";
+        private $database = "e-payroll";
+        public $conn;
+        public $pdo;
 
-class Database
-{
-    private $host = "localhost";
-    private $username = "root";
-    private $password = "";
-    private $database = "e-payroll";
+        public function __construct() {
+            $this->conn = new mysqli($this->host, $this->username, $this->password, $this->database);
+            if ($this->conn->connect_error) {
+                die("Koneksi gagal: " . $this->conn->connect_error);
+            }
+            try {
+                $this->pdo = new PDO("mysql:host=" . $this->host . ";dbname=" . $this->database, $this->username, $this->password);
+                $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            } catch(PDOException $e) {
+                die("Koneksi PDO gagal: " . $e->getMessage());
+            }
+        }
 
-    public $conn;
-    // construct untuk menjalankan koneksi ke database saat objek dibuat
-    // ketika ada construct ketika membuat new database maka otomatis akan menjalankan koneksi ke database
-    // mysqli adalah ekstensi PHP untuk mengakses database MySQL
-    public function __construct()
-    {
-        $this->conn = new mysqli(
-            $this->host,
-            $this->username,
-            $this->password,
-            $this->database
-        );
-
-        if ($this->conn->connect_error) {
-            die("Koneksi gagal: " . $this->conn->connect_error);
+        public function getConnection() {
+            return $this->pdo;
         }
     }
 }
+?>

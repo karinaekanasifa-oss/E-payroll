@@ -1,329 +1,418 @@
 <?php
-/**
- * --------------------------------------------------------------------------
- * DASHBOARD KARYAWAN ELEGAN & ULTRA ESTETIK - E-PAYROLL SYSTEM
- * --------------------------------------------------------------------------
- */
+session_start();
+require_once '../database/connection.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: '../../login/login.php");
+    exit;
+}
+
+$database = new Database();
+$db = $database->getConnection();
+
+$user_id = $_SESSION['user_id'] ?? null;
+$employee_id = $_SESSION['employee_id'] ?? 1;
+
+// Mengambil data detail karyawan & saldo gaji terakhir
+$nama_karyawan = $_SESSION['nama'] ?? 'Karyawan';
+$jabatan = 'Karyawan Tetap';
+$saldo_gaji = 0;
+
+try {
+    // Ambil gaji bersih dari slip gaji terbaru
+    $query = "SELECT total_gaji FROM payrolls WHERE employee_id = :employee_id AND status_cair = 'dibayar' ORDER BY id DESC LIMIT 1";
+    $stmt = $db->prepare($query);
+    $stmt->bindParam(":employee_id", $employee_id);
+    $stmt->execute();
+    $data_gaji = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($data_gaji) {
+        $saldo_gaji = $data_gaji['total_gaji'];
+    }
+} catch (PDOException $e) {
+    $saldo_gaji = 0;
+}
+
+// Logika sapaan waktu
+date_default_timezone_set('Asia/Jakarta');
+$jam = date('G');
+if ($jam >= 4 && $jam < 11) {
+    $sapaan = "Selamat Pagi";
+} elseif ($jam >= 11 && $jam < 15) {
+    $sapaan = "Selamat Siang";
+} elseif ($jam >= 15 && $jam < 18) {
+    $sapaan = "Selamat Sore";
+} else {
+    $sapaan = "Selamat Malam";
+}
 ?>
 
-<!-- Custom Style UI Estetik Modern -->
-<style>
-  /* Root Theme Variables */
-  :root {
-    --primary-grad: linear-gradient(135deg, #0d6efd 0%, #0043a8 100%);
-    --success-grad: linear-gradient(135deg, #10b981 0%, #047857 100%);
-    --warning-grad: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
-    --info-grad: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%);
-    --purple-grad: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-  }
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Karyawan - E-Payroll System</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-orange: #f97316;
+            --dark-orange: #ea580c;
+            --light-orange: #fff7ed;
+            --accent-orange: #fdba74;
+            --bg-color: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+        }
 
-  /* Glassmorphism & Micro-Interactions */
-  .hero-gradient {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-    border-radius: 28px;
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden;
+        }
 
-  .hero-gradient::before {
-    content: '';
-    position: absolute;
-    top: -40%;
-    right: -10%;
-    width: 380px;
-    height: 380px;
-    background: radial-gradient(circle, rgba(13, 110, 253, 0.25) 0%, rgba(255, 255, 255, 0) 70%);
-    border-radius: 50%;
-    animation: floatGlow 6s infinite alternate ease-in-out;
-  }
+        /* Navbar Clean Modern */
+        .navbar-custom {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        }
 
-  @keyframes floatGlow {
-    0% { transform: translate(0, 0) scale(1); }
-    100% { transform: translate(-30px, 30px) scale(1.15); }
-  }
+        .navbar-brand {
+            font-weight: 800;
+            color: var(--text-main) !important;
+            letter-spacing: -0.5px;
+        }
 
-  /* Estetik Feature Cards */
-  .estetik-card {
-    border: none;
-    border-radius: 20px;
-    background: #ffffff;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-    position: relative;
-    overflow: hidden;
-  }
+        .navbar-nav .nav-link {
+            color: var(--text-muted) !important;
+            font-weight: 600;
+            transition: all 0.25s ease;
+            padding: 0.5rem 1rem !important;
+            border-radius: 10px;
+        }
 
-  .estetik-card::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 4px;
-    background: transparent;
-    transition: all 0.3s ease;
-  }
+        .navbar-nav .nav-link:hover, 
+        .navbar-nav .nav-link.active {
+            color: var(--dark-orange) !important;
+            background-color: var(--light-orange);
+        }
 
-  .estetik-card.card-primary::after { background: var(--primary-grad); }
-  .estetik-card.card-success::after { background: var(--success-grad); }
-  .estetik-card.card-warning::after { background: var(--warning-grad); }
+        /* Hero Banner Sunset Orange */
+        .hero-section {
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            border: 1px solid #fed7aa;
+            color: var(--text-main);
+            border-radius: 1.5rem;
+            padding: 2.25rem 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(249, 115, 22, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
 
-  .estetik-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
-  }
+        /* Profile Card Top */
+        .user-profile-badge {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
 
-  /* Icon Glow & Bounce */
-  .icon-shape {
-    width: 68px;
-    height: 68px;
-    border-radius: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 26px;
-    transition: all 0.3s ease;
-  }
+        .user-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
 
-  .estetik-card:hover .icon-shape {
-    transform: scale(1.1) rotate(6deg);
-  }
+        /* Saldo Box Hero */
+        .saldo-box {
+            background: #ffffff;
+            border: 1px solid #fed7aa;
+            border-radius: 1.25rem;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 4px 15px rgba(249, 115, 22, 0.06);
+        }
 
-  /* Status Dot Pulse */
-  .pulse-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
-    background: rgba(34, 197, 94, 0.1);
-    color: #15803d;
-    border-radius: 30px;
-    font-size: 13px;
-    font-weight: 600;
-  }
+        /* Stat Card Ringkasan */
+        .stat-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 1.25rem;
+            background: #ffffff;
+            padding: 1.25rem 1.5rem;
+            transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        }
 
-  .pulse-dot {
-    width: 8px;
-    height: 8px;
-    background-color: #22c55e;
-    border-radius: 50%;
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-    animation: pulse 1.8s infinite;
-  }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 25px rgba(249, 115, 22, 0.1);
+            border-color: var(--accent-orange);
+        }
 
-  @keyframes pulse {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-  }
+        /* Card Menu Utama */
+        .card-menu {
+            border: 1px solid #e2e8f0;
+            border-radius: 1.25rem;
+            background: #ffffff;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        }
 
-  /* Action Link Buttons */
-  .card-action-btn {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 18px;
-    border-radius: 12px;
-    background: #f8fafc;
-    color: #334155;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.3s ease;
-  }
+        .card-menu:hover {
+            transform: translateY(-8px);
+            border-color: var(--accent-orange);
+            box-shadow: 0 20px 40px rgba(249, 115, 22, 0.12);
+        }
 
-  .card-action-btn:hover {
-    background: #0d6efd;
-    color: #ffffff !important;
-    padding-right: 22px;
-  }
+        .icon-box {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            margin-bottom: 1.25rem;
+            transition: transform 0.3s ease;
+        }
 
-  .card-action-btn:hover .arrow-icon {
-    transform: translateX(4px);
-  }
+        .card-menu:hover .icon-box {
+            transform: scale(1.1) rotate(6deg);
+        }
 
-  .arrow-icon {
-    transition: transform 0.3s ease;
-  }
+        /* Tombol Orange Gradient */
+        .btn-orange-custom {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+            border: none;
+            font-weight: 700;
+            border-radius: 50rem;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(249, 115, 22, 0.25);
+        }
 
-  /* Typography Contrast */
-  .text-dark-title {
-    color: #0f172a !important;
-    font-weight: 700;
-  }
+        .btn-orange-custom:hover {
+            background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(249, 115, 22, 0.35);
+        }
+    </style>
+</head>
+<body>
 
-  .text-subtle {
-    color: #64748b !important;
-  }
+    <!-- Navbar Karyawan Lengkap dengan Bar Profil -->
+    <nav class="navbar navbar-expand-lg navbar-light navbar-custom sticky-top py-2">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="dashboard.php">
+                <div class="text-white rounded-3 p-2 me-2 d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; background: linear-gradient(135deg, #f97316, #ea580c);">
+                    <i class="fa-solid fa-user-tie fs-5"></i>
+                </div>
+                E-Payroll <span class="text-muted fw-normal small ms-2 d-none d-sm-inline">| Portal Karyawan</span>
+            </a>
 
-  /* Step Guide Box */
-  .guide-box {
-    background: #ffffff;
-    border-radius: 18px;
-    padding: 28px;
-    border: 1px solid #f1f5f9;
-    transition: all 0.3s ease;
-  }
+            <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
-  .guide-box:hover {
-    border-color: #cbd5e1;
-    background: #fafafa;
-    transform: translateY(-4px);
-  }
-</style>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="dashboard.php"><i class="fa-solid fa-house me-1"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="presensi/presensi.php"><i class="fa-solid fa-clock-rotate-left me-1"></i> Presensi</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="izin/izin.php"><i class="fa-solid fa-envelope-open-text me-1"></i> Izin / Cuti</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="slip_gaji/slip.php"><i class="fa-solid fa-file-invoice-dollar me-1"></i> Slip Gaji</a>
+                    </li>
 
-<div class="container-fluid px-4 py-4">
+                    <!-- Profil User di Topbar -->
+                    <li class="nav-item ms-lg-3 my-2 my-lg-0">
+                        <div class="user-profile-badge">
+                            <div class="user-avatar">
+                                <?= strtoupper(substr($nama_karyawan, 0, 1)); ?>
+                            </div>
+                            <div class="lh-1">
+                                <span class="d-block fw-bold text-dark small mb-1"><?= htmlspecialchars($nama_karyawan); ?></span>
+                                <span class="badge bg-success bg-opacity-10 text-success p-1 fw-semibold" style="font-size: 0.68rem;">Online</span>
+                            </div>
+                        </div>
+                    </li>
 
-  <!-- HERO BANNER START -->
-  <div class="hero-gradient p-4 p-md-5 mb-5 shadow-lg text-white wow fadeIn" data-wow-delay="0.1s">
-    <div class="row align-items-center position-relative" style="z-index: 2;">
-      <div class="col-lg-8">
-        <div class="pulse-indicator bg-white text-dark mb-3 shadow-sm">
-          <span class="pulse-dot"></span> System Operational • Portal Karyawan
-        </div>
-        <h1 class="display-4 fw-bold text-white mb-2">
-          Selamat Datang, <?php echo htmlspecialchars($user_nama); ?>! 👋
-        </h1>
-        <p class="fs-5 text-light opacity-90 mb-4" style="max-width: 650px; line-height: 1.6;">
-          Pantau catatan kehadiran harian, ajukan izin kerja, dan unduh slip gaji bulanan Anda dengan mudah, transparan, dan real-time.
-        </p>
-        <div class="d-flex flex-wrap gap-3 pt-2">
-          <a href="index.php?page=presensi" class="btn btn-primary btn-lg rounded-3 fw-bold px-4 py-3 shadow-sm">
-            <i class="fa fa-fingerprint me-2"></i> Input Presensi
-          </a>
-          <a href="index.php?page=slip-gaji" class="btn btn-outline-light btn-lg rounded-3 fw-bold px-4 py-3">
-            <i class="fa fa-file-invoice-dollar me-2"></i> Lihat Slip Gaji
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- HERO BANNER END -->
-
-  <!-- ESTETIK CARDS BROWSER START -->
-  <div class="row g-4 mb-5">
-    
-    <!-- Card 1: Profil Karyawan -->
-    <div class="col-12 col-md-6 col-xl-4 wow fadeInUp" data-wow-delay="0.2s">
-      <div class="estetik-card card-primary p-4 h-100 d-flex flex-column justify-content-between">
-        <div>
-          <div class="d-flex align-items-center justify-content-between mb-4">
-            <div class="icon-shape bg-primary-subtle text-primary">
-              <i class="fa fa-user-gear"></i>
+                    <li class="nav-item ms-lg-2">
+                        <a class="btn btn-outline-danger btn-sm px-3 rounded-pill fw-semibold border-2" href="../../login/logout.php">
+                            <i class="fa-solid fa-right-from-bracket me-1"></i> Keluar
+                        </a>
+                    </li>
+                </ul>
             </div>
-            <span class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-bold">
-              ID: #EMP-<?php echo str_pad($employee_id, 4, '0', STR_PAD_LEFT); ?>
-            </span>
-          </div>
-          <p class="text-subtle text-uppercase fw-semibold mb-1 small">Informasi Pegawai</p>
-          <h4 class="text-dark-title mb-2"><?php echo htmlspecialchars($user_nama); ?></h4>
-          <p class="text-subtle mb-4"><i class="fa fa-envelope me-2 text-primary"></i><?php echo htmlspecialchars($user_email); ?></p>
         </div>
+    </nav>
+
+    <!-- Content Wrapper -->
+    <div class="container my-4">
         
-        <div class="pt-3 border-top d-flex justify-content-between align-items-center">
-          <span class="text-subtle small fw-medium">Role Akses:</span>
-          <span class="badge bg-dark text-white text-uppercase px-3 py-2 rounded-2 fw-semibold">
-            <?php echo htmlspecialchars($user_role); ?>
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Card 2: Status Presensi Hari Ini -->
-    <div class="col-12 col-md-6 col-xl-4 wow fadeInUp" data-wow-delay="0.3s">
-      <div class="estetik-card card-success p-4 h-100 d-flex flex-column justify-content-between">
-        <div>
-          <div class="d-flex align-items-center justify-content-between mb-4">
-            <div class="icon-shape bg-success-subtle text-success">
-              <i class="fa fa-clock-rotate-left"></i>
+        <!-- Hero Banner dengan Profil & Saldo Gaji (Emoticon #1: 👋) -->
+        <div class="hero-section d-flex flex-column flex-lg-row justify-content-between align-items-lg-center">
+            <div class="mb-3 mb-lg-0">
+                <span class="badge px-3 py-2 rounded-pill fw-bold mb-3 shadow-sm" style="background-color: #ffedd5; color: #ea580c; border: 1px solid #fed7aa;">
+                    <i class="fa-solid fa-sun me-1"></i> <?= $sapaan; ?>
+                </span>
+                <h1 class="fw-extrabold mb-2 display-6 text-dark">Halo, <?= htmlspecialchars($nama_karyawan); ?>! 👋</h1>
+                <p class="text-muted mb-0 lead" style="max-width: 580px; font-size: 0.98rem;">
+                    Selamat datang di portal mandiri. Kelola kehadiran harian, perizinan, dan pantau rincian gaji kamu secara terpusat.
+                </p>
             </div>
-            <span class="badge bg-success-subtle text-success px-3 py-2 rounded-pill fw-bold">
-              <i class="fa fa-calendar-day me-1"></i> <?php echo date('d M Y'); ?>
-            </span>
-          </div>
-          <p class="text-subtle text-uppercase fw-semibold mb-1 small">Kehadiran Harian</p>
-          <h4 class="text-dark-title mb-2">Presensi Hari Ini</h4>
-          <p class="text-subtle mb-4">Pastikan Anda melakukan presensi masuk dan keluar jam kerja secara tepat waktu.</p>
-        </div>
 
-        <div>
-          <a href="index.php?page=presensi" class="card-action-btn">
-            <span>Input Presensi Sekarang</span>
-            <i class="fa fa-arrow-right arrow-icon"></i>
-          </a>
-        </div>
-      </div>
-    </div>
+            <!-- Card Tampilan Saldo Gaji Karyawan -->
+            <div class="d-flex flex-column flex-sm-row gap-3">
+                <div class="saldo-box text-start text-sm-end">
+                    <div class="text-muted small fw-semibold mb-1">
+                        <i class="fa-solid fa-wallet text-warning me-1"></i> Saldo Gaji Diterima
+                    </div>
+                    <div class="fw-extrabold text-success fs-4">
+                        Rp <?= number_format($saldo_gaji, 0, ',', '.'); ?>
+                    </div>
+                    <div class="text-muted" style="font-size: 0.72rem;">Periode Gaji Terakhir</div>
+                </div>
 
-    <!-- Card 3: Slip Gaji Bulanan -->
-    <div class="col-12 col-md-12 col-xl-4 wow fadeInUp" data-wow-delay="0.4s">
-      <div class="estetik-card card-warning p-4 h-100 d-flex flex-column justify-content-between">
-        <div>
-          <div class="d-flex align-items-center justify-content-between mb-4">
-            <div class="icon-shape bg-warning-subtle text-warning">
-              <i class="fa fa-wallet"></i>
+                <div class="bg-white p-3 rounded-4 border shadow-sm text-center px-4 d-flex flex-column justify-content-center">
+                    <i class="fa-solid fa-calendar-check fs-4 mb-1 text-warning"></i>
+                    <span class="fw-bold text-dark small"><?= date('d M Y'); ?></span>
+                    <div class="text-muted" style="font-size: 0.72rem;">Sistem Normal</div>
+                </div>
             </div>
-            <span class="badge bg-warning-subtle text-warning px-3 py-2 rounded-pill fw-bold">
-              Periode Aktif
-            </span>
-          </div>
-          <p class="text-subtle text-uppercase fw-semibold mb-1 small">Informasi Penggajian</p>
-          <h4 class="text-dark-title mb-2">Slip Gaji Bulanan</h4>
-          <p class="text-subtle mb-4">Periksa rincian gaji pokok, tunjangan jabatan, dan rekap potongan penggajian Anda.</p>
         </div>
 
-        <div>
-          <a href="index.php?page=slip-gaji" class="card-action-btn">
-            <span>Buka & Unduh Slip</span>
-            <i class="fa fa-download arrow-icon"></i>
-          </a>
+        <!-- Section Ringkasan Informasi Cepat -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="stat-card d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3 shadow-sm" style="background-color: #fff7ed; color: #ea580c; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-fingerprint fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Absensi Kehadiran</div>
+                        <div class="fw-bold text-dark">Siap Rekam Shift</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3 shadow-sm" style="background-color: #fff1f2; color: #e11d48; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-envelope-circle-check fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Perizinan Kerja</div>
+                        <div class="fw-bold text-dark">Pantau Status HRD</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3 shadow-sm" style="background-color: #f0fdf4; color: #16a34a; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-money-check-dollar fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Slip Gaji Bulanan</div>
+                        <div class="fw-bold text-dark">Rincian & Unduh</div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
+
+        <!-- Grid Kartu Menu Utama Interaktif (Emoticon #2: 💵) -->
+        <div class="row g-4">
+            
+            <!-- Menu 1: Presensi Harian -->
+            <div class="col-md-4">
+                <div class="card card-menu h-100 p-4">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="icon-box shadow-sm" style="background-color: #fff7ed; color: #ea580c;">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </div>
+                            <h4 class="fw-bold text-dark mb-2">Presensi Harian</h4>
+                            <p class="text-muted small mb-4">Catat jam masuk dan jam keluar shift kerja kamu dengan praktis dan cepat langsung dari sini.</p>
+                        </div>
+                        <a href="presensi/presensi.php" class="btn btn-orange-custom w-100 text-center">
+                            Buka Presensi <i class="fa-solid fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu 2: Pengajuan Izin -->
+            <div class="col-md-4">
+                <div class="card card-menu h-100 p-4">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="icon-box shadow-sm" style="background-color: #fff1f2; color: #e11d48;">
+                                <i class="fa-solid fa-envelope-open-text"></i>
+                            </div>
+                            <h4 class="fw-bold text-dark mb-2">Pengajuan Izin</h4>
+                            <p class="text-muted small mb-4">Lagi berhalangan hadir atau mau ambil cuti? Langsung ajukan permohonan ke pihak HRD.</p>
+                        </div>
+                        <a href="izin/izin.php" class="btn btn-orange-custom w-100 text-center">
+                            Ajukan Izin <i class="fa-solid fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu 3: Slip Gaji Bulanan -->
+            <div class="col-md-4">
+                <div class="card card-menu h-100 p-4">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="icon-box shadow-sm" style="background-color: #f0fdf4; color: #16a34a;">
+                                <i class="fa-solid fa-file-invoice-dollar"></i>
+                            </div>
+                            <h4 class="fw-bold text-dark mb-2">Slip Gaji 💵</h4>
+                            <p class="text-muted small mb-4">Lihat rincian penerimaan gaji bersih, tunjangan, potongan, dan cetak slip resmi kamu.</p>
+                        </div>
+                        <a href="slip_gaji/slip.php" class="btn btn-orange-custom w-100 text-center">
+                            Lihat Slip Gaji <i class="fa-solid fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
-  </div>
-  <!-- ESTETIK CARDS END -->
-
-  <!-- FITUR PANDUAN KARYAWAN START -->
-  <div class="bg-white rounded-4 p-4 p-md-5 shadow-sm border mb-4 wow fadeInUp" data-wow-delay="0.5s">
-    <div class="text-center mx-auto mb-5" style="max-width: 600px;">
-      <span class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-bold mb-2">Layanan Mandiri</span>
-      <h3 class="fw-bold text-dark-title">Panduan Penggunaan Portal</h3>
-      <p class="text-subtle">Langkah mudah mengelola aktivitas administratif kerja Anda di E-Payroll</p>
-    </div>
-
-    <div class="row g-4">
-      <div class="col-md-4">
-        <div class="guide-box h-100 text-center">
-          <div class="icon-shape bg-primary-subtle text-primary mx-auto mb-3">
-            <i class="fa fa-fingerprint"></i>
-          </div>
-          <h5 class="fw-bold text-dark-title mb-2">1. Record Presensi</h5>
-          <p class="text-subtle small mb-0">Lakukan absensi sesuai lokasi dan jadwal jam kerja untuk menjaga akurasi rekapan kehadiran.</p>
+    <!-- Footer -->
+    <footer class="text-center py-4 text-muted small mt-5 border-top bg-white shadow-sm">
+        <div class="container">
+            &copy; 2026 E-Payroll System. Hak cipta dilindungi undang-undang.
         </div>
-      </div>
+    </footer>
 
-      <div class="col-md-4">
-        <div class="guide-box h-100 text-center">
-          <div class="icon-shape bg-info-subtle text-info mx-auto mb-3">
-            <i class="fa fa-file-signature"></i>
-          </div>
-          <h5 class="fw-bold text-dark-title mb-2">2. Pengajuan Cuti/Izin</h5>
-          <p class="text-subtle small mb-0">Ajukan permohonan ketidakhadiran kerja dengan bukti pendukung langsung ke HRD.</p>
-        </div>
-      </div>
-
-      <div class="col-md-4">
-        <div class="guide-box h-100 text-center">
-          <div class="icon-shape bg-success-subtle text-success mx-auto mb-3">
-            <i class="fa fa-receipt"></i>
-          </div>
-          <h5 class="fw-bold text-dark-title mb-2">3. Transparansi Gaji</h5>
-          <p class="text-subtle small mb-0">Unduh dokumen resmi slip gaji bulanan yang telah diproses dan diterbitkan oleh tim Finance.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- FITUR PANDUAN KARYAWAN END -->
-
-</div>
+    <!-- Bootstrap JS Bundle CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

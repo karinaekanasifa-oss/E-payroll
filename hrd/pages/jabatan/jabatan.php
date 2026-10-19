@@ -1,7 +1,7 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * HALAMAN KELOLA JABATAN - OOP VERSION (WARNA SENADA TEMPLATE & ANIMASI)
+ * HALAMAN KELOLA JABATAN - OOP VERSION (DENGAN PAGINATION BAHASA INDONESIA)
  * --------------------------------------------------------------------------
  */
 
@@ -15,8 +15,11 @@ class PositionOOP {
         $this->conn = $db->conn;
     }
 
-    public function tampilDataJabatan() {
-        return $this->conn->query("SELECT * FROM positions ORDER BY id DESC");
+    public function tampilDataJabatanPaginated($limit, $offset) {
+        $stmt = $this->conn->prepare("SELECT * FROM positions ORDER BY id DESC LIMIT ? OFFSET ?");
+        $stmt->bind_param("ii", $limit, $offset);
+        $stmt->execute();
+        return $stmt->get_result();
     }
 
     public function getTotalJabatan() {
@@ -32,48 +35,49 @@ class PositionOOP {
 
 $positionObj = new PositionOOP();
 
-$total_jabatan = $positionObj->getTotalJabatan();
-$rata_gaji     = $positionObj->getRataRataGaji();
-$query_jabatan = $positionObj->tampilDataJabatan();
+// Konfigurasi Pagination (5 data per halaman)
+$limit = 5;
+$page_no = isset($_GET['p']) && is_numeric($_GET['p']) ? (int)$_GET['p'] : 1;
+if ($page_no < 1) $page_no = 1;
+$offset = ($page_no - 1) * $limit;
 
-// Generate CSRF Token jika belum ada
+$total_jabatan = $positionObj->getTotalJabatan();
+$total_pages = ceil($total_jabatan / $limit);
+$rata_gaji     = $positionObj->getRataRataGaji();
+$query_jabatan = $positionObj->tampilDataJabatanPaginated($limit, $offset);
+
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $csrf_token = $_SESSION['csrf_token'];
 ?>
 
-<!-- START: CSS Custom Animasi & Warna Senada Template Admin -->
 <style>
-.card-hover-pop {
-  transition: all 0.3s ease-in-out;
-}
-.card-hover-pop:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
-}
+.card-hover-pop { transition: all 0.3s ease-in-out; }
+.card-hover-pop:hover { transform: translateY(-4px); box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important; }
+@keyframes slideUpFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.page-header, .card-hover-pop, .table-card-custom { animation: slideUpFade 0.3s ease-in-out; }
+.btn-template-theme { background-color: #143423; color: #fff; border: none; }
+.btn-template-theme:hover { background-color: #1b4731; color: #fff; }
 
-@keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Styling Pagination Indonesia */
+.pagination .page-item.active .page-link {
+    background-color: #143423;
+    border-color: #143423;
+    color: #ffffff;
 }
-.page-header, .card-hover-pop, .table-card-custom {
-  animation: slideUpFade 0.3s ease-in-out;
+.pagination .page-link {
+    color: #143423;
+    border-radius: 0.5rem;
+    margin: 0 2px;
+    font-weight: 600;
 }
-
-.btn-template-theme {
-  background-color: #143423;
-  color: #fff;
-  border: none;
-}
-.btn-template-theme:hover {
-  background-color: #1b4731;
-  color: #fff;
+.pagination .page-link:hover {
+    background-color: #e8f5e9;
+    color: #0b1d13;
 }
 </style>
-<!-- END: CSS Custom -->
 
-<!-- START: Page Header Banner -->
 <div class="page-header mb-4">
   <div>
     <h1 class="page-title fw-bold text-dark">Manajemen Jabatan</h1>
@@ -88,7 +92,6 @@ $csrf_token = $_SESSION['csrf_token'];
   </nav>
 </div>
 
-<!-- START: Kartu Statistik Ringkasan -->
 <div class="row mb-4">
   <div class="col-xl-6 col-md-6 mb-3 mb-xl-0">
     <div class="card border-0 shadow-sm p-3 border-start border-success border-4 card-hover-pop rounded-3 bg-white">
@@ -121,7 +124,6 @@ $csrf_token = $_SESSION['csrf_token'];
   </a>
 </div>
 
-<!-- START: Basic Table Card Container -->
 <div class="table-card-custom rounded-3 shadow-sm border-0 bg-white p-4">
   <div class="table-header-control d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <div class="table-search-box flex-grow-1" style="max-width: 350px;">
@@ -150,7 +152,7 @@ $csrf_token = $_SESSION['csrf_token'];
       </thead>
       <tbody>
         <?php if ($query_jabatan && $query_jabatan->num_rows > 0): ?>
-          <?php $no = 1; while ($row = $query_jabatan->fetch_assoc()): ?>
+          <?php $no = $offset + 1; while ($row = $query_jabatan->fetch_assoc()): ?>
             <tr>
               <td class="table-order-id fw-bold text-muted">#JAB-00<?php echo $no++; ?></td>
               <td class="fw-bold text-dark"><?php echo htmlspecialchars($row['nama_jabatan'] ?? '-'); ?></td>
@@ -173,14 +175,40 @@ $csrf_token = $_SESSION['csrf_token'];
     </table>
   </div>
 
+  <!-- Pagination Footer Control (Bahasa Indonesia) -->
+  <?php if ($total_pages > 1): ?>
+  <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+    <div class="text-muted small">
+      Menampilkan halaman <strong><?= $page_no; ?></strong> dari <strong><?= $total_pages; ?></strong> (Total <?= $total_jabatan; ?> Jabatan)
+    </div>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item <?= ($page_no <= 1) ? 'disabled' : ''; ?>">
+          <a class="page-link" href="index.php?page=jabatan&p=<?= $page_no - 1; ?>">Sebelumnya</a>
+        </li>
+
+        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+          <li class="page-item <?= ($page_no == $i) ? 'active' : ''; ?>">
+            <a class="page-link" href="index.php?page=jabatan&p=<?= $i; ?>"><?= $i; ?></a>
+          </li>
+        <?php endfor; ?>
+
+        <li class="page-item <?= ($page_no >= $total_pages) ? 'disabled' : ''; ?>">
+          <a class="page-link" href="index.php?page=jabatan&p=<?= $page_no + 1; ?>">Selanjutnya</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  <?php else: ?>
   <div class="table-footer-control mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
     <span class="badge bg-light text-success border px-3 py-2 rounded-2">Status: Sinkron Aktif</span>
   </div>
+  <?php endif; ?>
+
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const searchInput = document.getElementById('searchJabatanInput');
@@ -190,16 +218,11 @@ document.addEventListener("DOMContentLoaded", function () {
         searchInput.addEventListener('keyup', function () {
             let filter = searchInput.value.toLowerCase();
             let trs = table.getElementsByTagName('tr');
-
             for (let i = 1; i < trs.length; i++) {
                 let tdNama = trs[i].getElementsByTagName('td')[1];
                 if (tdNama) {
                     let textValue = tdNama.textContent || tdNama.innerText;
-                    if (textValue.toLowerCase().indexOf(filter) > -1) {
-                        trs[i].style.display = "";
-                    } else {
-                        trs[i].style.display = "none";
-                    }
+                    trs[i].style.display = (textValue.toLowerCase().indexOf(filter) > -1) ? "" : "none";
                 }
             }
         });
@@ -210,29 +233,9 @@ document.addEventListener("DOMContentLoaded", function () {
         exportPdfBtn.addEventListener('click', function () {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-
             doc.setFontSize(16);
-            doc.setTextColor(40, 40, 40);
             doc.text("Laporan Data Jabatan - E-Payroll", 14, 20);
-            
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text("Dicetak pada: " + new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), 14, 26);
-
-            doc.autoTable({
-                html: '#myTableJabatan',
-                startY: 32,
-                columns: [
-                    { header: 'No', dataKey: 0 },
-                    { header: 'Nama Jabatan', dataKey: 1 },
-                    { header: 'Gaji Pokok', dataKey: 2 },
-                    { header: 'Tunjangan', dataKey: 3 }
-                ],
-                theme: 'grid',
-                headStyles: { fillColor: [20, 52, 35] },
-                styles: { fontSize: 8, cellPadding: 4 }
-            });
-
+            doc.autoTable({ html: '#myTableJabatan', startY: 32 });
             doc.save("data_jabatan.pdf");
         });
     }

@@ -1,148 +1,188 @@
 <?php
-/**
- * --------------------------------------------------------------------------
- * HALAMAN INPUT / FORM PRESENSI HARI INI - OOP VERSION
- * --------------------------------------------------------------------------
- */
+session_start();
+require_once '../../database/connection.php';
 
-// Memasukkan file koneksi database
-if (file_exists('database/connection.php')) {
-    require_once 'database/connection.php';
-} elseif (file_exists('../database/connection.php')) {
-    require_once '../database/connection.php';
-} elseif (file_exists('../../database/connection.php')) {
-    require_once '../../database/connection.php';
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../../../login/login.php");
+    exit;
 }
 
-class InputPresensiPage {
-    private $conn;
-    private $employee_id;
+$database = new Database();
+$db = $database->getConnection();
 
-    public function __construct($employee_id) {
-        $db = new Database();
-        $this->conn = $db->conn;
-        $this->employee_id = (int) $employee_id;
-    }
+$employee_id = $_SESSION['employee_id'] ?? 1;
 
-    // Mengambil data presensi hari ini
-    public function getPresensiHariIni() {
-        $tanggal = date('Y-m-d');
-        $stmt = $this->conn->prepare("SELECT * FROM attendances WHERE employee_id = ? AND tanggal = ? LIMIT 1");
-        $stmt->bind_param("is", $this->employee_id, $tanggal);
-        $stmt->execute();
-        return $stmt->get_result()->fetch_assoc();
-    }
+if (isset($_POST['submit_presensi'])) {
+    $shift_id   = $_POST['shift_id'];
+    $tanggal    = date('Y-m-d');
+    $jam_masuk  = $_POST['jam_masuk'];
+    $jam_keluar = $_POST['jam_keluar'] ?? null;
+    $status     = $_POST['status'];
 
-    // Proses pencatatan presensi masuk atau keluar
-    public function catatPresensi($action) {
-        $tanggal = date('Y-m-d');
-        $waktu = date('H:i:s');
-        $statusEnum = 'hadir';
-        $defaultShiftId = 1;
+    $query = "INSERT INTO attedances (employee_id, shift_id, shifts_id, tanggal, jam_masuk, jam_keluar, status) 
+              VALUES (:employee_id, :shift_id, :shift_id, :tanggal, :jam_masuk, :jam_keluar, :status)";
+    $stmt = $db->prepare($query);
+    
+    $stmt->bindParam(":employee_id", $employee_id);
+    $stmt->bindParam(":shift_id", $shift_id);
+    $stmt->bindParam(":tanggal", $tanggal);
+    $stmt->bindParam(":jam_masuk", $jam_masuk);
+    $stmt->bindParam(":jam_keluar", $jam_keluar);
+    $stmt->bindParam(":status", $status);
 
-        if ($action === 'masuk') {
-            $stmt = $this->conn->prepare("INSERT INTO attendances (employee_id, shifts_id, tanggal, jam_masuk, status) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("iisss", $this->employee_id, $defaultShiftId, $tanggal, $waktu, $statusEnum);
-            return $stmt->execute();
-        } elseif ($action === 'keluar') {
-            $stmt = $this->conn->prepare("UPDATE attendances SET jam_keluar = ? WHERE employee_id = ? AND tanggal = ?");
-            $stmt->bind_param("sis", $waktu, $this->employee_id, $tanggal);
-            return $stmt->execute();
-        }
-        return false;
-    }
-}
-
-$employee_id = $_SESSION['employee_id'] ?? 0;
-$inputObj = new InputPresensiPage($employee_id);
-
-// Handling aksi form submit (masuk / keluar)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    if ($inputObj->catatPresensi($action)) {
-        echo "<script>alert('Berhasil mencatat presensi $action!'); window.location='index.php?page=presensi';</script>";
-        exit;
+    if ($stmt->execute()) {
+        echo "<script>alert('Presensi berhasil disimpan!'); window.location='presensi.php';</script>";
     } else {
-        echo "<script>alert('Gagal mencatat presensi. Silakan coba lagi.'); window.location='index.php?page=input-presensi';</script>";
-        exit;
+        echo "<script>alert('Gagal menyimpan presensi.');</script>";
     }
 }
-
-$hariIni = $inputObj->getPresensiHariIni();
 ?>
 
-<style>
-.btn-template-theme { background-color: #143423; color: #fff; border: none; }
-.btn-template-theme:hover { background-color: #1b4731; color: #fff; }
-</style>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Input Presensi Harian - E-Payroll System</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-orange: #f97316;
+            --dark-orange: #ea580c;
+            --light-orange: #fff7ed;
+            --bg-color: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+        }
 
-<div class="page-header mb-4">
-  <div>
-    <h1 class="page-title fw-bold text-dark">Form Absensi Harian</h1>
-    <p class="page-subtitle text-muted">Lakukan pencatatan jam masuk dan jam keluar kantor Anda secara tepat waktu.</p>
-  </div>
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="index.php?page=dashboard" class="text-decoration-none text-success">Home</a></li>
-      <li class="breadcrumb-item"><a href="index.php?page=presensi" class="text-decoration-none text-success">Presensi</a></li>
-      <li class="breadcrumb-item active text-dark" aria-current="page">Form Input</li>
-    </ol>
-  </nav>
-</div>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+        }
 
-<div class="row justify-content-center">
-  <div class="col-lg-6">
-    <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white text-center">
-      
-      <div class="mb-4">
-        <span class="badge bg-light text-dark px-3 py-2 rounded-pill fw-semibold border">
-          <i class="bi bi-calendar-day text-success me-2"></i> Tanggal Hari Ini: <?= date('d F Y'); ?>
-        </span>
-      </div>
+        .navbar-custom {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        }
 
-      <!-- Kotak Tampilan Jam Masuk & Keluar -->
-      <div class="row g-3 mb-4">
-        <div class="col-6">
-          <div class="p-3 bg-light rounded-3 border-start border-4 border-success text-start">
-            <small class="text-muted d-block fw-semibold mb-1">Jam Masuk</small>
-            <span class="fw-bold text-success fs-4">
-              <?= !empty($hariIni['jam_masuk']) ? htmlspecialchars($hariIni['jam_masuk']) : '-- : --'; ?>
-            </span>
-          </div>
+        .card-custom {
+            border: 1px solid #e2e8f0;
+            border-radius: 1.5rem;
+            background: #ffffff;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+        }
+
+        .btn-orange-custom {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+            border: none;
+            font-weight: 700;
+            border-radius: 50rem;
+            padding: 0.75rem 2rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(249, 115, 22, 0.25);
+        }
+
+        .btn-orange-custom:hover {
+            background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(249, 115, 22, 0.35);
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #f97316;
+            box-shadow: 0 0 0 0.25rem rgba(249, 115, 22, 0.15);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light navbar-custom sticky-top py-3">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center fw-bold" href="presensi.php">
+                <div class="text-white rounded-3 p-2 me-2 d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; background: linear-gradient(135deg, #f97316, #ea580c);">
+                    <i class="fa-solid fa-clock-rotate-left fs-5"></i>
+                </div>
+                E-Payroll <span class="text-muted fw-normal small ms-2">| Form Input Presensi</span>
+            </a>
+            <a href="presensi.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 fw-semibold">
+                <i class="fa-solid fa-arrow-left me-1"></i> Kembali
+            </a>
         </div>
-        <div class="col-6">
-          <div class="p-3 bg-light rounded-3 border-start border-4 border-danger text-start">
-            <small class="text-muted d-block fw-semibold mb-1">Jam Keluar</small>
-            <span class="fw-bold text-danger fs-4">
-              <?= !empty($hariIni['jam_keluar']) ? htmlspecialchars($hariIni['jam_keluar']) : '-- : --'; ?>
-            </span>
-          </div>
+    </nav>
+
+    <!-- Form Container -->
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-md-7">
+                <div class="card card-custom p-4">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle p-3 me-3" style="background-color: #fff7ed; color: #ea580c;">
+                                <i class="fa-solid fa-fingerprint fs-4"></i>
+                            </div>
+                            <div>
+                                <h4 class="fw-bold text-dark mb-0">Form Presensi Harian Karyawan</h4>
+                                <p class="text-muted small mb-0">Silakan catat data jam kerja kamu hari ini dengan teliti.</p>
+                            </div>
+                        </div>
+                        <hr class="my-4 text-muted opacity-25">
+
+                        <form action="" method="POST">
+                            <div class="mb-3">
+                                <label for="shift_id" class="form-label fw-bold text-dark">Pilih Shift Kerja</label>
+                                <select name="shift_id" id="shift_id" class="form-select py-2 rounded-3" required>
+                                    <option value="">-- Pilih Shift Kerja --</option>
+                                    <option value="1">Shift Pagi</option>
+                                    <option value="2">Shift Siang</option>
+                                    <option value="3">Shift Malam</option>
+                                </select>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="jam_masuk" class="form-label fw-bold text-dark">Jam Masuk</label>
+                                    <input type="time" name="jam_masuk" id="jam_masuk" class="form-control py-2 rounded-3" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="jam_keluar" class="form-label fw-bold text-dark">Jam Keluar (Opsional)</label>
+                                    <input type="time" name="jam_keluar" id="jam_keluar" class="form-control py-2 rounded-3">
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="status" class="form-label fw-bold text-dark">Status Kehadiran</label>
+                                <select name="status" id="status" class="form-select py-2 rounded-3" required>
+                                    <option value="hadir">Hadir</option>
+                                    <option value="izin">Izin</option>
+                                    <option value="sakit">Sakit</option>
+                                    <option value="alfa">Alfa</option>
+                                </select>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center pt-2">
+                                <a href="presensi.php" class="btn btn-light rounded-pill px-4 fw-semibold text-muted">Batal</a>
+                                <button type="submit" name="submit_presensi" class="btn btn-orange-custom">
+                                    <i class="fa-solid fa-save me-1"></i> Simpan Presensi
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-
-      <!-- Form Eksekusi Tombol Absen -->
-      <form action="" method="POST">
-        <?php if (empty($hariIni['jam_masuk'])): ?>
-          <button type="submit" name="action" value="masuk" class="btn btn-success w-100 py-3 fw-bold rounded-pill shadow-sm fs-5">
-            <i class="bi bi-box-arrow-in-right me-2"></i> Klik Untuk Absen Masuk
-          </button>
-        <?php elseif (empty($hariIni['jam_keluar'])): ?>
-          <button type="submit" name="action" value="keluar" class="btn btn-danger w-100 py-3 fw-bold rounded-pill shadow-sm fs-5">
-            <i class="bi bi-box-arrow-left me-2"></i> Klik Untuk Absen Keluar
-          </button>
-        <?php else: ?>
-          <div class="alert alert-success py-3 mb-3 rounded-pill fw-semibold shadow-sm">
-            <i class="bi bi-check-circle-fill me-2"></i> Presensi masuk & keluar hari ini sudah lengkap tercatat!
-          </div>
-        <?php endif; ?>
-      </form>
-
-      <div class="mt-4">
-        <a href="index.php?page=presensi" class="text-secondary text-decoration-none fw-semibold">
-          <i class="bi bi-arrow-left me-1"></i> Kembali ke Riwayat Presensi
-        </a>
-      </div>
-
     </div>
-  </div>
-</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

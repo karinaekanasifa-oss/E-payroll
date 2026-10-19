@@ -1,277 +1,325 @@
 <?php
-/**
- * --------------------------------------------------------------------------
- * HALAMAN PRESENSI KARYAWAN - OOP VERSION (KHUSUS KARYAWAN)
- * --------------------------------------------------------------------------
- */
+session_start();
+require_once '../../database/connection.php';
 
-// Panggil file koneksi database
-if (file_exists('database/connection.php')) {
-    require_once 'database/connection.php';
-} elseif (file_exists('../database/connection.php')) {
-    require_once '../database/connection.php';
-} elseif (file_exists('../../database/connection.php')) {
-    require_once '../../database/connection.php';
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../../../login/login.php");
+    exit;
 }
 
-class KaryawanPresensiPage {
-    private $conn;
-    private $employee_id;
+$database = new Database();
+$db = $database->getConnection();
 
-    public function __construct($employee_id) {
-        $db = new Database();
-        $this->conn = $db->conn;
-        $this->employee_id = (int) $employee_id;
-    }
+$employee_id = $_SESSION['employee_id'] ?? 1;
 
-    // Menghitung total presensi karyawan berdasarkan status
-    public function getAttendanceCountByStatus($status) {
-        $stmt = $this->conn->prepare("SELECT COUNT(*) as total FROM attendances WHERE employee_id = ? AND status = ?");
-        $stmt->bind_param("is", $this->employee_id, $status);
-        $stmt->execute();
-        $result = $stmt->get_result()->fetch_assoc();
-        return $result['total'] ?? 0;
-    }
-
-    // Mengambil riwayat presensi karyawan dengan JOIN ke shifts
-    public function getAttendancesData($filter_periode = '') {
-        $query = "SELECT attendances.id as att_id, attendances.tanggal, attendances.jam_masuk, 
-                         attendances.jam_keluar, attendances.status,
-                         shifts.nama_shift 
-                  FROM attendances 
-                  LEFT JOIN shifts ON attendances.shifts_id = shifts.id 
-                  WHERE attendances.employee_id = " . $this->employee_id;
-
-        if ($filter_periode == 'triwulan_1') {
-            $query .= " AND MONTH(attendances.tanggal) BETWEEN 1 AND 3";
-        } elseif ($filter_periode == 'triwulan_2') {
-            $query .= " AND MONTH(attendances.tanggal) BETWEEN 4 AND 6";
-        } elseif ($filter_periode == 'triwulan_3') {
-            $query .= " AND MONTH(attendances.tanggal) BETWEEN 7 AND 9";
-        } elseif ($filter_periode == 'triwulan_4') {
-            $query .= " AND MONTH(attendances.tanggal) BETWEEN 10 AND 12";
-        }
-
-        $query .= " ORDER BY attendances.tanggal DESC, attendances.id DESC";
-        return $this->conn->query($query);
-    }
+try {
+    // Kueri mengambil data presensi karyawan
+    $query = "SELECT * FROM attedances WHERE employee_id = :employee_id ORDER BY tanggal DESC";
+    $stmt = $db->prepare($query);
+    $stmt->bindParam(":employee_id", $employee_id);
+    $stmt->execute();
+    $data_presensi = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $data_presensi = [];
 }
 
-$employee_id = $_SESSION['employee_id'] ?? 0;
-$user_nama   = $_SESSION['nama'] ?? 'Karyawan';
+// Menghitung statistik sederhana untuk ringkasan card
+$total_hadir = 0;
+$total_izin  = 0;
+$total_sakit = 0;
 
-$presensiObj = new KaryawanPresensiPage($employee_id);
-$filter_periode = isset($_GET['periode']) ? $_GET['periode'] : '';
-
-$total_hadir = $presensiObj->getAttendanceCountByStatus('hadir');
-$total_izin  = $presensiObj->getAttendanceCountByStatus('izin');
-$total_sakit = $presensiObj->getAttendanceCountByStatus('sakit');
-$total_alfa  = $presensiObj->getAttendanceCountByStatus('alfa');
-
-$query_absensi = $presensiObj->getAttendancesData($filter_periode);
+foreach ($data_presensi as $row) {
+    $st = strtolower($row['status'] ?? '');
+    if ($st == 'hadir') $total_hadir++;
+    elseif ($st == 'izin') $total_izin++;
+    elseif ($st == 'sakit') $total_sakit++;
+}
 ?>
 
-<style>
-.card-hover-pop { transition: all 0.3s ease-in-out; }
-.card-hover-pop:hover { transform: translateY(-4px); box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important; }
-@keyframes slideUpFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.page-header, .card-hover-pop, .table-card-custom { animation: slideUpFade 0.3s ease-in-out; }
-.btn-template-theme { background-color: #143423; color: #fff; border: none; }
-.btn-template-theme:hover { background-color: #1b4731; color: #fff; }
-</style>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riwayat Presensi - E-Payroll System</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-orange: #f97316;
+            --dark-orange: #ea580c;
+            --light-orange: #fff7ed;
+            --accent-orange: #fdba74;
+            --bg-color: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+        }
 
-<div class="page-header mb-4">
-  <div>
-    <h1 class="page-title fw-bold text-dark">Presensi Kehadiran</h1>
-    <p class="page-subtitle text-muted">Riwayat pencatatan jam masuk, jam keluar, shift, dan status kehadiran Anda.</p>
-  </div>
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="index.php?page=dashboard" class="text-decoration-none text-success">Home</a></li>
-      <li class="breadcrumb-item text-muted">Karyawan</li>
-      <li class="breadcrumb-item active text-dark" aria-current="page">Presensi</li>
-    </ol>
-  </nav>
-</div>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden;
+        }
 
-<!-- Kartu Statistik -->
-<div class="row mb-4">
-  <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
-    <div class="card border-0 shadow-sm p-3 border-start border-success border-4 card-hover-pop rounded-3 bg-white">
-      <div class="d-flex align-items-center">
-        <div class="flex-grow-1">
-          <span class="text-muted small fw-bold text-uppercase">Total Hadir</span>
-          <h3 class="mb-0 fw-bold text-success mt-1"><?= $total_hadir; ?> <span class="fs-6 fw-normal text-muted">Hari</span></h3>
-        </div>
-        <div class="fs-2 text-success opacity-75"><i class="bi bi-check-circle-fill"></i></div>
-      </div>
-    </div>
-  </div>
-  <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
-    <div class="card border-0 shadow-sm p-3 border-start border-info border-4 card-hover-pop rounded-3 bg-white">
-      <div class="d-flex align-items-center">
-        <div class="flex-grow-1">
-          <span class="text-muted small fw-bold text-uppercase">Total Izin</span>
-          <h3 class="mb-0 fw-bold text-info mt-1"><?= $total_izin; ?> <span class="fs-6 fw-normal text-muted">Hari</span></h3>
-        </div>
-        <div class="fs-2 text-info opacity-75"><i class="bi bi-info-circle-fill"></i></div>
-      </div>
-    </div>
-  </div>
-  <div class="col-xl-3 col-md-6 mb-3 mb-sm-0">
-    <div class="card border-0 shadow-sm p-3 border-start border-warning border-4 card-hover-pop rounded-3 bg-white">
-      <div class="d-flex align-items-center">
-        <div class="flex-grow-1">
-          <span class="text-muted small fw-bold text-uppercase">Total Sakit</span>
-          <h3 class="mb-0 fw-bold text-warning mt-1"><?= $total_sakit; ?> <span class="fs-6 fw-normal text-muted">Hari</span></h3>
-        </div>
-        <div class="fs-2 text-warning opacity-75"><i class="bi bi-heart-pulse-fill"></i></div>
-      </div>
-    </div>
-  </div>
-  <div class="col-xl-3 col-md-6">
-    <div class="card border-0 shadow-sm p-3 border-start border-danger border-4 card-hover-pop rounded-3 bg-white">
-      <div class="d-flex align-items-center">
-        <div class="flex-grow-1">
-          <span class="text-muted small fw-bold text-uppercase">Total Alfa</span>
-          <h3 class="mb-0 fw-bold text-danger mt-1"><?= $total_alfa; ?> <span class="fs-6 fw-normal text-muted">Hari</span></h3>
-        </div>
-        <div class="fs-2 text-danger opacity-75"><i class="bi bi-x-circle-fill"></i></div>
-      </div>
-    </div>
-  </div>
-</div>
+        /* Navbar Clean Modern */
+        .navbar-custom {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        }
 
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
-  <a href="index.php?page=input-presensi" class="btn btn-template-theme px-4 py-2 rounded-2 shadow-sm">
-    <i class="bi bi-fingerprint me-1"></i> Form Absensi Harian
-  </a>
-  <form method="GET" action="index.php" class="d-flex align-items-center gap-2">
-    <input type="hidden" name="page" value="presensi">
-    <select name="periode" class="form-select form-select-sm rounded-2 px-3 shadow-sm" onchange="this.form.submit()">
-      <option value="">-- Semua Periode --</option>
-      <option value="triwulan_1" <?= ($filter_periode == 'triwulan_1') ? 'selected' : ''; ?>>Triwulan I (Jan - Mar)</option>
-      <option value="triwulan_2" <?= ($filter_periode == 'triwulan_2') ? 'selected' : ''; ?>>Triwulan II (Apr - Jun)</option>
-      <option value="triwulan_3" <?= ($filter_periode == 'triwulan_3') ? 'selected' : ''; ?>>Triwulan III (Jul - Sep)</option>
-      <option value="triwulan_4" <?= ($filter_periode == 'triwulan_4') ? 'selected' : ''; ?>>Triwulan IV (Okt - Des)</option>
-    </select>
-  </form>
-</div>
+        .navbar-brand {
+            font-weight: 800;
+            color: var(--text-main) !important;
+            letter-spacing: -0.5px;
+        }
 
-<div class="table-card-custom rounded-3 shadow-sm border-0 bg-white p-4">
-  <div class="table-header-control d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-    <div class="table-search-box flex-grow-1" style="max-width: 350px;">
-      <div class="input-group input-group-sm">
-        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-        <input type="text" id="searchPresensiInput" class="form-control bg-light border-start-0 shadow-none" placeholder="Cari tanggal, shift, atau status...">
-      </div>
-    </div>
-    <div class="table-filter-group">
-      <button class="btn btn-danger btn-sm px-3 rounded-2 shadow-sm" id="btnExportPDF" type="button">
-        <i class="bi bi-file-earmark-pdf-fill me-1"></i> Export PDF
-      </button>
-    </div>
-  </div>
+        .navbar-nav .nav-link {
+            color: var(--text-muted) !important;
+            font-weight: 600;
+            transition: all 0.25s ease;
+            padding: 0.5rem 1rem !important;
+            border-radius: 10px;
+        }
 
-  <div class="table-responsive">
-    <table class="table align-middle table-hover mb-0" id="myTablePresensi">
-      <thead class="table-light text-uppercase fs-7 text-muted">
-        <tr>
-          <th class="py-3">No</th>
-          <th class="py-3">Tanggal</th>
-          <th class="py-3">Shift</th>
-          <th class="py-3">Nama Karyawan</th>
-          <th class="py-3">Jam Masuk</th>
-          <th class="py-3">Jam Keluar</th>
-          <th class="py-3">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php if ($query_absensi && $query_absensi->num_rows > 0): ?>
-          <?php $no = 1; while ($row = $query_absensi->fetch_assoc()): ?>
-            <?php 
-              $status = strtolower($row['status']);
-              $badgeClass = 'bg-secondary';
-              if ($status == 'hadir') $badgeClass = 'bg-success';
-              elseif ($status == 'izin') $badgeClass = 'bg-info text-dark';
-              elseif ($status == 'sakit') $badgeClass = 'bg-warning text-dark';
-              elseif ($status == 'alfa') $badgeClass = 'bg-danger';
-            ?>
-            <tr>
-              <td class="table-order-id fw-bold text-muted">#PRES-00<?php echo $no++; ?></td>
-              <td class="text-muted"><?php echo htmlspecialchars($row['tanggal'] ?? '-'); ?></td>
-              <td><span class="badge bg-success-subtle text-success px-2 py-1 text-uppercase"><?php echo htmlspecialchars($row['nama_shift'] ?? 'Normal'); ?></span></td>
-              <td>
-                <div class="d-flex align-items-center">
-                  <div class="avatar-initial rounded-circle bg-success-subtle text-success fw-bold d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px; font-size: 13px;">
-                    <?= strtoupper(substr($user_nama, 0, 1)); ?>
-                  </div>
-                  <div><span class="fw-bold text-dark d-block"><?php echo htmlspecialchars($user_nama); ?></span></div>
+        .navbar-nav .nav-link:hover, 
+        .navbar-nav .nav-link.active {
+            color: var(--dark-orange) !important;
+            background-color: var(--light-orange);
+        }
+
+        /* Header Card Hero */
+        .header-card {
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            border: 1px solid #fed7aa;
+            border-radius: 1.5rem;
+            padding: 2rem 2.25rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(249, 115, 22, 0.08);
+        }
+
+        /* Stat Card Ringkasan Presensi */
+        .stat-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 1.25rem;
+            background: #ffffff;
+            padding: 1.25rem 1.5rem;
+            transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 25px rgba(249, 115, 22, 0.1);
+            border-color: var(--accent-orange);
+        }
+
+        /* Table Card Container */
+        .card-custom {
+            border: 1px solid #e2e8f0;
+            border-radius: 1.25rem;
+            background: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            overflow: hidden;
+        }
+
+        .table thead {
+            background-color: #f8fafc;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .table thead th {
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 1rem;
+        }
+
+        .table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+
+        .table tbody tr:hover {
+            background-color: #fff7ed;
+        }
+
+        /* Tombol Orange Custom */
+        .btn-orange-custom {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+            border: none;
+            font-weight: 700;
+            border-radius: 50rem;
+            padding: 0.65rem 1.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(249, 115, 22, 0.25);
+        }
+
+        .btn-orange-custom:hover {
+            background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(249, 115, 22, 0.35);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar Karyawan -->
+    <nav class="navbar navbar-expand-lg navbar-light navbar-custom sticky-top py-3">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="../dashboard.php">
+                <div class="text-white rounded-3 p-2 me-2 d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; background: linear-gradient(135deg, #f97316, #ea580c);">
+                    <i class="fa-solid fa-clock-rotate-left fs-5"></i>
                 </div>
-              </td>
-              <td class="text-muted"><?php echo ($status == 'hadir') ? htmlspecialchars($row['jam_masuk'] ?? '-') : '-'; ?></td>
-              <td class="text-muted"><?php echo ($status == 'hadir') ? htmlspecialchars($row['jam_keluar'] ?? '-') : '-'; ?></td>
-              <td><span class="badge <?php echo $badgeClass; ?> text-uppercase px-2 py-1"><?php echo htmlspecialchars($row['status']); ?></span></td>
-            </tr>
-          <?php endwhile; ?>
-        <?php else: ?>
-          <tr>
-            <td colspan="7" class="text-center text-muted py-4">Belum ada riwayat presensi untuk periode ini.</td>
-          </tr>
-        <?php endif; ?>
-      </tbody>
-    </table>
-  </div>
-</div>
+                E-Payroll <span class="text-muted fw-normal small ms-2 d-none d-sm-inline">| Rekam Presensi</span>
+            </a>
+            <a href="../dashboard.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3 fw-semibold">
+                <i class="fa-solid fa-house me-1"></i> Dashboard
+            </a>
+        </div>
+    </nav>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const searchInput = document.getElementById('searchPresensiInput');
-    const table = document.getElementById('myTablePresensi');
+    <!-- Content Wrapper -->
+    <div class="container my-5">
 
-    if (searchInput && table) {
-        searchInput.addEventListener('keyup', function () {
-            let filter = searchInput.value.toLowerCase();
-            let trs = table.getElementsByTagName('tr');
-            for (let i = 1; i < trs.length; i++) {
-                let rowText = trs[i].textContent || trs[i].innerText;
-                trs[i].style.display = (rowText.toLowerCase().indexOf(filter) > -1) ? "" : "none";
-            }
-        });
-    }
+        <!-- Header Section -->
+        <div class="header-card d-flex flex-column flex-md-row justify-content-between align-items-center">
+            <div class="mb-3 mb-md-0">
+                <span class="badge px-3 py-2 rounded-pill fw-bold mb-2 shadow-sm" style="background-color: #ffedd5; color: #ea580c; border: 1px solid #fed7aa;">
+                    <i class="fa-solid fa-fingerprint me-1"></i> Kehadiran Real-time
+                </span>
+                <h2 class="fw-extrabold text-dark mb-1">Riwayat Presensi Harian 🕒</h2>
+                <p class="text-muted mb-0">Pantau catatan jam masuk, jam keluar, dan status kehadiran kamu di sini.</p>
+            </div>
+            <div>
+                <a href="input.php" class="btn btn-orange-custom shadow">
+                    <i class="fa-solid fa-plus me-1"></i> Input Presensi Baru
+                </a>
+            </div>
+        </div>
 
-    const exportPdfBtn = document.getElementById('btnExportPDF');
-    if (exportPdfBtn) {
-        exportPdfBtn.addEventListener('click', function () {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.setFontSize(16);
-            doc.setTextColor(40, 40, 40);
-            doc.text("Laporan Riwayat Presensi Karyawan - E-Payroll", 14, 20);
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text("Dicetak pada: " + new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), 14, 26);
+        <!-- 3 Stat Card Ringkasan Presensi -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="stat-card d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3 text-success shadow-sm" style="background-color: #f0fdf4; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-user-check fs-4" style="color: #16a34a;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Total Hadir</div>
+                        <div class="fw-bold text-dark fs-5"><?= $total_hadir; ?> Hari</div>
+                    </div>
+                </div>
+            </div>
 
-            doc.autoTable({
-                html: '#myTablePresensi',
-                startY: 32,
-                columns: [
-                    { header: 'No', dataKey: 0 },
-                    { header: 'Tanggal', dataKey: 1 },
-                    { header: 'Shift', dataKey: 2 },
-                    { header: 'Nama Karyawan', dataKey: 3 },
-                    { header: 'Jam Masuk', dataKey: 4 },
-                    { header: 'Jam Keluar', dataKey: 5 },
-                    { header: 'Status', dataKey: 6 }
-                ],
-                theme: 'grid',
-                headStyles: { fillColor: [20, 52, 35] },
-                styles: { fontSize: 8, cellPadding: 4 }
-            });
-            doc.save("laporan_presensi_karyawan.pdf");
-        });
-    }
-});
-</script>
+            <div class="col-md-4">
+                <div class="stat-card d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3 text-warning shadow-sm" style="background-color: #fff7ed; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-user-clock fs-4" style="color: #ea580c;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Izin & Cuti</div>
+                        <div class="fw-bold text-dark fs-5"><?= $total_izin; ?> Hari</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="stat-card d-flex align-items-center">
+                    <div class="rounded-circle p-3 me-3 text-danger shadow-sm" style="background-color: #fff1f2; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-briefcase-medical fs-4" style="color: #e11d48;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Sakit</div>
+                        <div class="fw-bold text-dark fs-5"><?= $total_sakit; ?> Hari</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table Card Data Presensi -->
+        <div class="card card-custom p-3">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="text-center" style="width: 60px;">No</th>
+                            <th>Tanggal Hari</th>
+                            <th>Jam Masuk</th>
+                            <th>Jam Keluar</th>
+                            <th class="text-center">Status Kehadiran</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (count($data_presensi) > 0): ?>
+                            <?php $no = 1; foreach ($data_presensi as $row): ?>
+                            <tr>
+                                <td class="text-center fw-bold text-muted"><?= $no++; ?></td>
+                                <td class="fw-semibold text-dark">
+                                    <i class="fa-regular fa-calendar me-2 text-warning" style="color: #f97316 !important;"></i>
+                                    <?= htmlspecialchars($row['tanggal']); ?>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-semibold" style="font-size: 0.85rem;">
+                                        <i class="fa-solid fa-right-to-bracket me-1"></i> <?= htmlspecialchars($row['jam_masuk']); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php if (!empty($row['jam_keluar']) && $row['jam_keluar'] != '00:00:00'): ?>
+                                        <span class="badge bg-danger bg-opacity-10 text-danger px-3 py-2 rounded-pill fw-semibold" style="font-size: 0.85rem;">
+                                            <i class="fa-solid fa-right-from-bracket me-1"></i> <?= htmlspecialchars($row['jam_keluar']); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted small italic">Belum Absen Keluar</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-center">
+                                    <?php 
+                                        $status = strtolower($row['status']);
+                                        $badge_class = 'bg-secondary';
+                                        if ($status == 'hadir') $badge_class = 'bg-success';
+                                        elseif ($status == 'izin') $badge_class = 'bg-warning text-dark';
+                                        elseif ($status == 'sakit') $badge_class = 'bg-danger';
+                                        elseif ($status == 'alfa') $badge_class = 'bg-dark';
+                                    ?>
+                                    <span class="badge <?= $badge_class; ?> px-3 py-2 rounded-pill fw-semibold text-capitalize">
+                                        <?= htmlspecialchars($row['status']); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" alt="Empty" style="width: 80px;" class="mb-3 opacity-50"><br>
+                                    <span class="text-muted fw-semibold">Belum ada riwayat presensi yang tercatat.</span>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-muted small mt-5 border-top bg-white shadow-sm">
+        <div class="container">
+            &copy; 2026 E-Payroll System. Hak cipta dilindungi undang-undang.
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS Bundle CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

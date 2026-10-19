@@ -1,7 +1,7 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * DATABASE CONNECTION - HRD MODULE
+ * DATABASE CONNECTION - E-PAYROLL SYSTEM
  * --------------------------------------------------------------------------
  */
 
@@ -11,7 +11,7 @@ if (!class_exists('Database')) {
         private $host = "localhost";
         private $username = "root";
         private $password = "";
-        private $database = "e-payroll";
+        private $database = "e-payroll"; // <-- Ubah ke e-payroll, jangan rental-mobil
 
         public $conn;
 

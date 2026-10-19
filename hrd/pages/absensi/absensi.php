@@ -1,7 +1,7 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * HALAMAN KELOLA ABSENSI - OOP VERSION (DENGAN KOLOM SHIFT)
+ * HALAMAN KELOLA ABSENSI - OOP VERSION (DENGAN PAGINATION & BAHASA INDONESIA)
  * --------------------------------------------------------------------------
  */
 
@@ -23,8 +23,26 @@ class AttendanceManagement {
         return $result['total'] ?? 0;
     }
 
-    // Mengambil data absensi dengan JOIN ke employees, users, dan shifts
-    public function getAttendancesData($filter_periode = '') {
+    // Hitung total data absensi dengan filter periode
+    public function getTotalAttendances($filter_periode = '') {
+        $query = "SELECT COUNT(*) as total FROM attedances JOIN employees ON attedances.employee_id = employees.id JOIN users ON employees.user_id = users.id LEFT JOIN shifts ON attedances.shift_id = shifts.id";
+        
+        if ($filter_periode == 'triwulan_1') {
+            $query .= " WHERE MONTH(attedances.tanggal) BETWEEN 1 AND 3";
+        } elseif ($filter_periode == 'triwulan_2') {
+            $query .= " WHERE MONTH(attedances.tanggal) BETWEEN 4 AND 6";
+        } elseif ($filter_periode == 'triwulan_3') {
+            $query .= " WHERE MONTH(attedances.tanggal) BETWEEN 7 AND 9";
+        } elseif ($filter_periode == 'triwulan_4') {
+            $query .= " WHERE MONTH(attedances.tanggal) BETWEEN 10 AND 12";
+        }
+
+        $result = $this->conn->query($query)->fetch_assoc();
+        return (int) ($result['total'] ?? 0);
+    }
+
+    // Mengambil data absensi dengan LIMIT dan OFFSET untuk pagination
+    public function getAttendancesDataPaginated($limit, $offset, $filter_periode = '') {
         $query = "SELECT attedances.id as att_id, attedances.tanggal, attedances.jam_masuk, 
                          attedances.jam_keluar, attedances.status,
                          employees.nip, users.nama, shifts.nama_shift 
@@ -43,8 +61,12 @@ class AttendanceManagement {
             $query .= " WHERE MONTH(attedances.tanggal) BETWEEN 10 AND 12";
         }
 
-        $query .= " ORDER BY attedances.tanggal DESC, attedances.id DESC";
-        return $this->conn->query($query);
+        $query .= " ORDER BY attedances.tanggal DESC, attedances.id DESC LIMIT ? OFFSET ?";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("ii", $limit, $offset);
+        $stmt->execute();
+        return $stmt->get_result();
     }
 }
 
@@ -56,7 +78,16 @@ $total_izin  = $attendanceObj->getAttendanceCountByStatus('izin');
 $total_sakit = $attendanceObj->getAttendanceCountByStatus('sakit');
 $total_alfa  = $attendanceObj->getAttendanceCountByStatus('alfa');
 
-$query_absensi = $attendanceObj->getAttendancesData($filter_periode);
+// Konfigurasi Pagination (5 data per halaman)
+$limit = 5;
+$page_no = isset($_GET['p']) && is_numeric($_GET['p']) ? (int)$_GET['p'] : 1;
+if ($page_no < 1) $page_no = 1;
+$offset = ($page_no - 1) * $limit;
+
+$total_data = $attendanceObj->getTotalAttendances($filter_periode);
+$total_pages = ceil($total_data / $limit);
+
+$query_absensi = $attendanceObj->getAttendancesDataPaginated($limit, $offset, $filter_periode);
 ?>
 
 <style>
@@ -66,6 +97,23 @@ $query_absensi = $attendanceObj->getAttendancesData($filter_periode);
 .page-header, .card-hover-pop, .table-card-custom { animation: slideUpFade 0.3s ease-in-out; }
 .btn-template-theme { background-color: #143423; color: #fff; border: none; }
 .btn-template-theme:hover { background-color: #1b4731; color: #fff; }
+
+/* Styling Pagination */
+.pagination .page-item.active .page-link {
+    background-color: #143423;
+    border-color: #143423;
+    color: #ffffff;
+}
+.pagination .page-link {
+    color: #143423;
+    border-radius: 0.5rem;
+    margin: 0 2px;
+    font-weight: 600;
+}
+.pagination .page-link:hover {
+    background-color: #e8f5e9;
+    color: #0b1d13;
+}
 </style>
 
 <div class="page-header mb-4">
@@ -178,7 +226,7 @@ $query_absensi = $attendanceObj->getAttendancesData($filter_periode);
       </thead>
       <tbody>
         <?php if ($query_absensi && $query_absensi->num_rows > 0): ?>
-          <?php $no = 1; while ($row = $query_absensi->fetch_assoc()): ?>
+          <?php $no = $offset + 1; while ($row = $query_absensi->fetch_assoc()): ?>
             <?php 
               $status = strtolower($row['status']);
               $badgeClass = 'bg-secondary';
@@ -219,6 +267,44 @@ $query_absensi = $attendanceObj->getAttendancesData($filter_periode);
       </tbody>
     </table>
   </div>
+
+  <!-- START: Pagination Footer Control (Bahasa Indonesia) -->
+  <?php if ($total_pages > 1): ?>
+  <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+    <div class="text-muted small">
+      Menampilkan halaman <strong><?= $page_no; ?></strong> dari <strong><?= $total_pages; ?></strong> (Total <?= $total_data; ?> Data Absensi)
+    </div>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        <!-- Tombol Sebelumnya -->
+        <li class="page-item <?= ($page_no <= 1) ? 'disabled' : ''; ?>">
+          <a class="page-link" href="index.php?page=absensi&periode=<?= $filter_periode; ?>&p=<?= $page_no - 1; ?>">
+            Sebelumnya
+          </a>
+        </li>
+
+        <!-- Nomor Halaman -->
+        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+          <li class="page-item <?= ($page_no == $i) ? 'active' : ''; ?>">
+            <a class="page-link" href="index.php?page=absensi&periode=<?= $filter_periode; ?>&p=<?= $i; ?>"><?= $i; ?></a>
+          </li>
+        <?php endfor; ?>
+
+        <!-- Tombol Selanjutnya -->
+        <li class="page-item <?= ($page_no >= $total_pages) ? 'disabled' : ''; ?>">
+          <a class="page-link" href="index.php?page=absensi&periode=<?= $filter_periode; ?>&p=<?= $page_no + 1; ?>">
+            Selanjutnya
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  <?php else: ?>
+  <div class="table-footer-control mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
+    <span class="badge bg-light text-success border px-3 py-2 rounded-2">Status: Sinkron Aktif</span>
+  </div>
+  <?php endif; ?>
+
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

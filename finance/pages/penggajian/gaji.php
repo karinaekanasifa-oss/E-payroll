@@ -164,7 +164,7 @@ $total_pages = ($total_rows > 0) ? ceil($total_rows / $limit) : 1;
     
     <div class="col-md-4">
       <label class="form-label small fw-bold text-muted mb-1">Filter Periode Bulan</label>
-      <input type="month" name="bulan" class="form-control form-control-sm rounded-3 shadow-none border" value="<?= htmlspecialchars($bulan_filter); ?>">
+      <input type="month" name="bulan" class="form-control form-control-sm rounded-3 shadow-none border" value="<?= htmlspecialchars($bulan_filter); ?>" >
     </div>
     
     <div class="col-md-4 d-flex gap-2">

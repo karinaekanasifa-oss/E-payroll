@@ -1,17 +1,18 @@
 <?php
 /**
  * --------------------------------------------------------------------------
- * ADVANCED SECURITY AUTHENTICATION CLASS - E-PAYROLL SYSTEM
+ * ADVANCED SECURITY AUTHENTICATION CLASS - E-PAYROLL SYSTEM (MYSQLI SUPPORT)
  * --------------------------------------------------------------------------
  */
 
-// Panggil file koneksi secara aman lintas modul (HRD, Finance, Karyawan)
+// Panggil file koneksi secara aman lintas modul
 if (!class_exists('Database')) {
     $paths = [
         __DIR__ . '/../../karyawan/database/connection.php',
         __DIR__ . '/../database/connection.php',
         '../database/connection.php',
-        '../../karyawan/database/connection.php'
+        '../../karyawan/database/connection.php',
+        '../../hrd/database/connection.php'
     ];
     foreach ($paths as $path) {
         if (file_exists($path)) {
@@ -27,7 +28,8 @@ class Auth {
     public function __construct() {
         if (class_exists('Database')) {
             $db = new Database();
-            $this->conn = $db->conn;
+            // Mengambil koneksi MySQLi ($this->conn)
+            $this->conn = isset($db->conn) ? $db->conn : null;
         }
 
         if (session_status() === PHP_SESSION_NONE) {
@@ -92,6 +94,7 @@ class Auth {
             return "Format email tidak valid!";
         }
 
+        // Kueri Login Menggunakan Standar MySQLi
         $stmt = $this->conn->prepare("SELECT users.*, positions.nama_jabatan 
                                       FROM users 
                                       LEFT JOIN employees ON users.id = employees.user_id 
@@ -104,7 +107,10 @@ class Auth {
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
 
-            if (password_verify($password, $user['password'])) {
+            // Mendukung password hash maupun teks biasa
+            $passwordMatch = password_verify($password, $user['password']) || ($password === $user['password']);
+
+            if ($passwordMatch) {
                 $_SESSION['login_attempts'] = 0;
                 session_regenerate_id(true);
 
@@ -127,13 +133,15 @@ class Auth {
                 $roleUser = $_SESSION['role'];
                 $namaJabatan = strtolower(trim($user['nama_jabatan'] ?? ''));
 
-                // Pengalihan Lokasi Berdasarkan Role yang Aman
+                // Routing Tujuan Berdasarkan Role secara Otomatis
                 $basePath = '/E-payroll';
 
                 if ($roleUser == 'hrd' || str_contains($namaJabatan, 'hrd')) {
                     header("Location: " . $basePath . "/hrd/index.php");
                 } elseif ($roleUser == 'finance' || str_contains($namaJabatan, 'finance')) {
                     header("Location: " . $basePath . "/finance/index.php");
+                } elseif ($roleUser == 'karyawan') {
+                    header("Location: " . $basePath . "/karyawan/pages/dashboard.php");
                 } else {
                     header("Location: " . $basePath . "/index.php");
                 }
