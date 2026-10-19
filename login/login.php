@@ -235,9 +235,6 @@ $csrf_token = $auth->generateCsrfToken();
         <div class="orb orb-2"></div>
 
         <div style="z-index: 5;">
-            <div class="d-inline-flex align-items-center bg-white bg-opacity-10 backdrop-blur px-3 py-2 rounded-pill text-white fw-semibold mb-3 small">
-                <i class="bi bi-shield-fill-check text-warning me-2"></i> Enterprise Security Core
-            </div>
             <h1 class="display-3 fw-extrabold mb-3" style="letter-spacing: -1px;">E-Payroll System</h1>
             <p class="fs-5 text-white-50 lh-base" style="max-width: 520px;">
                 Platform manajemen terpadu untuk efisiensi operasional pegawai, kalkulasi gaji, dan transparansi finansial perusahaan.

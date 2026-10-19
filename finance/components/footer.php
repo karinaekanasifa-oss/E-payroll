@@ -5,15 +5,15 @@
         </span>
         <span class="footer-separator">|</span>
         <span class="footer-copy">&copy; 2026 E-Payrolls <i class="bi bi-heart-fill text-danger footer-heart"></i> by<a
-            href="https://sparkadminpro.gumroad.com/" target="_blank">Rina's</a>• Distributed by<a
-            href="https://www.themewagon.com/" target="_blank">ThemeWagon</a> </span>
+            href="https://sparkadminpro.gumroad.com/" target="_blank">Halaman Finance</a>• Distributed by<a
+            href="https://www.themewagon.com/" target="_blank">Rina's</a> </span>
       </div>
-      <div class="footer-right">
+      <!-- <div class="footer-right">
         <ul class="footer-links">
           <li><a href="#" class="footer-link">Overview</a></li>
           <li><a href="#" class="footer-link">Statistics</a></li>
           <li><a href="#" class="footer-link">Help & Documentation</a></li>
           <li><a href="#" class="footer-link">Status <span class="status-dot"></span></a></li>
         </ul>
-      </div>
+      </div> -->
     </footer>

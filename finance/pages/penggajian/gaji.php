@@ -157,14 +157,28 @@ $total_pages = ($total_rows > 0) ? ceil($total_rows / $limit) : 1;
   </div>
 </div>
 
-<!-- Filter Berdasarkan 1 Bulan (Sudah Sejajar) -->
+<!-- Filter Berdasarkan Dropdown Periode Bulan (Januari - Desember 2026) -->
 <div class="card border-0 shadow-sm rounded-4 p-3 mb-4 bg-white">
   <form method="GET" action="index.php" class="row g-3 align-items-end">
     <input type="hidden" name="page" value="gaji">
     
     <div class="col-md-4">
-      <label class="form-label small fw-bold text-muted mb-1">Filter Periode Bulan</label>
-      <input type="month" name="bulan" class="form-control form-control-sm rounded-3 shadow-none border" value="<?= htmlspecialchars($bulan_filter); ?>" >
+        <label class="form-label small fw-bold text-muted">Filter Periode Bulan</label>
+        <select name="bulan" class="form-select form-select-sm rounded-3 shadow-sm">
+            <option value="">-- Semua Periode Bulan --</option>
+            <option value="2026-01" <?= ($bulan_filter == '2026-01') ? 'selected' : ''; ?>>Januari 2026</option>
+            <option value="2026-02" <?= ($bulan_filter == '2026-02') ? 'selected' : ''; ?>>Februari 2026</option>
+            <option value="2026-03" <?= ($bulan_filter == '2026-03') ? 'selected' : ''; ?>>Maret 2026</option>
+            <option value="2026-04" <?= ($bulan_filter == '2026-04') ? 'selected' : ''; ?>>April 2026</option>
+            <option value="2026-05" <?= ($bulan_filter == '2026-05') ? 'selected' : ''; ?>>Mei 2026</option>
+            <option value="2026-06" <?= ($bulan_filter == '2026-06') ? 'selected' : ''; ?>>Juni 2026</option>
+            <option value="2026-07" <?= ($bulan_filter == '2026-07') ? 'selected' : ''; ?>>Juli 2026</option>
+            <option value="2026-08" <?= ($bulan_filter == '2026-08') ? 'selected' : ''; ?>>Agustus 2026</option>
+            <option value="2026-09" <?= ($bulan_filter == '2026-09') ? 'selected' : ''; ?>>September 2026</option>
+            <option value="2026-10" <?= ($bulan_filter == '2026-10') ? 'selected' : ''; ?>>Oktober 2026</option>
+            <option value="2026-11" <?= ($bulan_filter == '2026-11') ? 'selected' : ''; ?>>November 2026</option>
+            <option value="2026-12" <?= ($bulan_filter == '2026-12') ? 'selected' : ''; ?>>Desember 2026</option>
+        </select>
     </div>
     
     <div class="col-md-4 d-flex gap-2">
